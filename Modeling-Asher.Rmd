@@ -1,0 +1,24 @@
+```{r}
+trainingDataRaw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/moneyball-training-data.csv")) #Load the training data
+FullModel <- lm(TARGET_WINS ~.-INDEX, trainingDataRaw) #Create a linear model using all predictors. The INDEX column is excluded.
+summary(FullModel) #Summary of full model
+stepFull <- step(FullModel) #Put full model through stepwise regression, where predictors with less significance are sequentially removed.
+summary(stepFull)
+
+predictionsStepFull <- predict(stepFull, trainingDataRaw) #Generate predictions using the stepFull model
+View(predictionsStepFull)
+rmseStep <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepFull)] - predictionsStepFull[!is.na(predictionsStepFull)])^2)) #Generate the RMSE of the stepFull model
+rmseStep
+par(mfrow=c(2,2)) #Set up a four panel plot for evaluating regression
+plot(stepFull) #Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
+
+```
+```{r}
+#Evaluation of Stepwise model without TEAM_BATTING_HBP
+ReducedModel <- lm(TARGET_WINS ~., trainingDataRaw[,c(2:10, 12:17)])
+summary(ReducedModel)
+stepReduced <- step(ReducedModel)
+predictionsStepReduced <- predict(stepReduced, trainingDataRaw[,c(2:10, 12:17)])
+rmseStepR <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepReduced)] - predictionsStepReduced[!is.na(predictionsStepReduced)])^2))
+rmseStepR
+```
