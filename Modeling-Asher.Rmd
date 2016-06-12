@@ -1,18 +1,28 @@
 ```{r}
 trainingDataRaw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/moneyball-training-data.csv")) #Load the training data
-FullModel <- lm(TARGET_WINS ~.-INDEX, trainingDataRaw) #Create a linear model using all predictors. The INDEX column is excluded.
+#Create a linear model using all predictors. The INDEX column is excluded.
+FullModel <- lm(TARGET_WINS ~.-INDEX, trainingDataRaw)
 summary(FullModel) #Summary of full model
-stepFull <- step(FullModel) #Put full model through stepwise regression, where predictors with less significance are sequentially removed.
+#Put full model through stepwise regression, where predictors with less significance are sequentially removed.
+stepFull <- step(FullModel) 
 summary(stepFull)
 
-predictionsStepFull <- predict(stepFull, trainingDataRaw) #Generate predictions using the stepFull model
+
+#Generate predictions using the stepFull model
+predictionsStepFull <- predict(stepFull, trainingDataRaw) 
 View(predictionsStepFull)
-rmseStep <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepFull)] - predictionsStepFull[!is.na(predictionsStepFull)])^2)) #Generate the RMSE of the stepFull model
+
+#Generate the RMSE of the stepFull model
+rmseStep <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepFull)] - predictionsStepFull[!is.na(predictionsStepFull)])^2)) 
 rmseStep
-par(mfrow=c(2,2)) #Set up a four panel plot for evaluating regression
-plot(stepFull) #Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
+
+ #Set up a four panel plot for evaluating regression
+par(mfrow=c(2,2))
+#Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
+plot(stepFull) 
 
 ```
+
 ```{r}
 #Evaluation of Stepwise model without TEAM_BATTING_HBP
 ReducedModel <- lm(TARGET_WINS ~., trainingDataRaw[,c(2:10, 12:17)])
