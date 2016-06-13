@@ -29,14 +29,15 @@ View(cor(new_data))
 ###Create a linear model using all predictors. The INDEX column is excluded.
 FullModel <- lm(TARGET_WINS ~.-INDEX, trainingDataRaw)
 summary(FullModel) #Summary of full model
-#Put full model through stepwise regression, where predictors with less significance are sequentially removed.
+###Put full model through stepwise regression, where predictors with less significance are sequentially removed.
 stepFull <- step(FullModel) 
 summary(stepFull)
 
-
+```{r}
 ###Generate predictions using the stepFull model
 predictionsStepFull <- predict(stepFull, trainingDataRaw) 
 View(predictionsStepFull)
+```
 
 ###Generate the RMSE of the stepFull model
 rmseStep <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepFull)] - predictionsStepFull[!is.na(predictionsStepFull)])^2)) 
