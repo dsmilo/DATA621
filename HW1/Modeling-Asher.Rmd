@@ -43,15 +43,14 @@ View(predictionsStepFull)
 rmseStep <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepFull)] - predictionsStepFull[!is.na(predictionsStepFull)])^2)) 
 rmseStep
 
-###Set up a four panel plot for evaluating regression
-par(mfrow=c(2,2))
-###Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
-plot(stepFull) 
+
+par(mfrow=c(2,2)) #Set up a four panel plot for evaluating regression
+plot(stepFull) #Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
 
 ```
 
-```{r}
 ###Evaluation of Stepwise model without TEAM_BATTING_HBP
+```{r}
 ReducedModel <- lm(TARGET_WINS ~., trainingDataRaw[,c(2:10, 12:17)])
 summary(ReducedModel)
 stepReduced <- step(ReducedModel)
