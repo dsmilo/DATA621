@@ -1,0 +1,26 @@
+#Load Data
+
+```{r}
+raw_data <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv")) 
+raw_data <- raw_data[,c(2:17)] # delete index
+str(raw_data)
+summary(raw_data)
+```
+
+The number of missing values of "TEAM_BATTING_HBP"  is 2085.
+
+```{r}
+df = raw_data[-which(raw_data$TEAM_PITCHING_SO>=5832),]
+```
+
+#####Imputing Missing values with median
+```{r}
+for (i in 1:16){
+df[,i][is.na(df[,i])] <-  median(df[,i], na.rm = TRUE)
+}
+
+summary(df)
+View(cor(df))
+```
+
+
