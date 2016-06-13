@@ -1,5 +1,5 @@
 ```{r}
-trainingDataRaw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/moneyball-training-data.csv")) #Load the training data
+trainingDataRaw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv")) #Load the training data
 #Create a linear model using all predictors. The INDEX column is excluded.
 FullModel <- lm(TARGET_WINS ~.-INDEX, trainingDataRaw)
 summary(FullModel) #Summary of full model
