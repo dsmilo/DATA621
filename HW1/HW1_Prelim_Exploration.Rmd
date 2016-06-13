@@ -61,3 +61,12 @@ kable(mv_df, digits = 2)
 
 ```
 
+##Graphs
+```{r}
+par(mfrow = c(1,2))
+for (var_count in 3:17) {
+  plot(x = trainingdata[, var_count], y = trainingdata$TARGET_WINS, xlab = names(trainingdata)[var_count], ylab = "Target Wins")
+}
+```
+
+
