@@ -1,5 +1,31 @@
+`#Load Data
+
 ```{r}
-trainingDataRaw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv")) #Load the training data
+trainingDataRaw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv")) 
+trainingDataRaw <- trainingDataRaw[,c(2:17)] # delete index
+str(trainingDataRaw)
+summary(trainingDataRaw)
+```
+
+The number of missing values of "TEAM_BATTING_HBP"  is 2085.
+
+#Imputing Missing values
+```{r}
+library(mice)
+tempData <- mice(trainingDataRaw,m=5,maxit=50,meth='pmm',seed=500)
+summary(tempData)
+
+new_data <- complete(tempData, 1)
+summary(new_data)
+View(cor(new_data))
+```
+
+
+
+
+
+
+
 #Create a linear model using all predictors. The INDEX column is excluded.
 FullModel <- lm(TARGET_WINS ~.-INDEX, trainingDataRaw)
 summary(FullModel) #Summary of full model
