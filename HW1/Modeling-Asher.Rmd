@@ -39,14 +39,15 @@ predictionsStepFull <- predict(stepFull, trainingDataRaw)
 View(predictionsStepFull)
 ```
 
-###Generate the RMSE of the stepFull model
+####Generate the RMSE of the stepFull model
+```{r}
 rmseStep <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepFull)] - predictionsStepFull[!is.na(predictionsStepFull)])^2)) 
 rmseStep
+```
 
-
+```{r}
 par(mfrow=c(2,2)) #Set up a four panel plot for evaluating regression
 plot(stepFull) #Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
-
 ```
 
 ###Evaluation of Stepwise model without TEAM_BATTING_HBP
