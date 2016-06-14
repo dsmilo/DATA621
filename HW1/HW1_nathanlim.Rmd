@@ -21,6 +21,53 @@ df[,i][is.na(df[,i])] <-  median(df[,i], na.rm = TRUE)
 
 summary(df)
 View(cor(df))
+hist(df$TARGET_WINS)
+
+
+
+
 ```
+
+
+# Remove outliers
+```{r}
+new_df=df
+
+library(outliers)
+for (i in 1:16){
+outliers = which(outlier(test_df[,i],logical=TRUE))
+new_df = new_df[-outliers,] 
+}
+
+str(new_df)
+
+```
+
+
+```{r}
+fitall <- lm(TARGET_WINS ~. , new_df)
+summary(fitall)
+
+model<- lm(TARGET_WINS ~  sqrt(TEAM_BATTING_H)+TEAM_PITCHING_H, new_df)
+plot(model)
+
+
+df_predict <- data.frame(cbind(original=df$TARGET_WINS, predicted=predict(fitall, df)))
+
+
+plot(df_predict$original, df_predict$predicted, xlim=c(0,150), ylim=c(0,150))
+
+fit1=lm(df_predict$predicted~df_predict$original)
+x=c(1:150)
+y=x
+df5=data.frame(cbind(x,y))
+abline(df5$x,df5$y, col='red')
+
+summary(fit1)
+
+
+```
+
+
 
 
