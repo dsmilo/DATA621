@@ -41,7 +41,7 @@ Exclusion | Explanation
 |---|---|
 INDEX == 1347 | This row had a suspicious set of zero entries
 TEAM_BATTING_BB == 0 | Anomalously low walk count (expected occurences of a zero value for this predictor are zero)
-TEAM_BATTING_SO | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_strike2.shtml) - may not be relevant if the data is not from the MLB
+TEAM_BATTING_SO | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_strike2.shtml)
 TEAM_BATTING_HR | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_hr7.shtml)
 
 
