@@ -16,6 +16,7 @@ The dataset contains 17 columns - an index column (INDEX), a response column (TA
 Two predictors in particular stand out:
 
 Predictor Name | Description | Impact | % Missing Values | Correlation Coefficient with Response | p-value
+---|---|---|---|---|---|
 TEAM_BATTING_HBP | Batters hit by pitch (get a free base) | Positive Impact on Wins | 91.6% | 7% | 31%
 TEAM_BASERUN_CS | Strikeouts by batters | Negative Impact on Wins | 33.9% | 2% | 39%
 
