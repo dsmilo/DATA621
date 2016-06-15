@@ -43,7 +43,7 @@ TEAM_BATTING_SO == 0 | There's a gradient of strikeouts until 66, and then it go
 TEAM_PITCHING_SO == 0 | There's a gradient of strikeouts until 181, and then it goes directly to zero, which seems suspect
 INDEX == 1347 | This row had a suspicious set of zero entries
 TEAM_BATTING_BB == 0 | Anomalously low walk count (expected occurences of a zero value for this predictor are zero)
-TEAM_PITCHING_SO | (link)[http://www.baseball-almanac.com/recbooks/rb_strike2.shtml]
+TEAM_PITCHING_SO | Outside of recognized records[link](http://www.baseball-almanac.com/recbooks/rb_strike2.shtml)
 
 
 It should be noted that the records excluded from the first two rows of the table above are the same exact points (which would technically make the second exclusion redundant...). That suggests that for whatever reason, strikeouts were not recorded for those rows, but were marked as zero. Those two predictors have the same number of NA values, 102, suggesting their recording method was linked somehow.
