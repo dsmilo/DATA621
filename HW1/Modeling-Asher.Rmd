@@ -52,7 +52,7 @@ I then created a linear regression, and created additional, improved regression 
 
 ```{r}
 dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
-dfremove <- subset(dfraw, TEAM_BATTING_SO == 0 | TEAM_PITCHING_SO == 0 | INDEX == 1347 | TEAM_BATTING_BB == 0 | TEAM_PITCHING_SO > 1535 | TEAM_PITCHING_SO < 308)$INDEX #Identify rows for removal, have zero strikeouts or bases stolen
+dfremove <- subset(dfraw, TEAM_BATTING_SO == 0 | INDEX == 1347 | TEAM_BATTING_BB == 0 | TEAM_PITCHING_SO > 1535 | TEAM_PITCHING_SO < 308 | TEAM_BATTING_SO < 308 | TEAM_BATTING_SO > 1535)$INDEX #Identify rows for removal, have zero strikeouts or bases stolen
 df <- subset(dfraw, !(INDEX %in% dfremove))
 df <- df[, -c(1,10,11)] #Remove caught stealing and hit by pitcher variables
 #View(df)
@@ -68,10 +68,7 @@ fit3 <- update(fit2, .~. - TEAM_BATTING_2B) #Removal of TEAM_BATTING_2B increase
 summary(fit3)
 fit4 <- update(fit3, .~. - TEAM_PITCHING_H) #Removal of TEAM_PITCHING_H increases F-stat, 147.1 to 152.7
 summary(fit4)
-
-
-
-fit5 <- update(fit4, .~. - TEAM_FIELDING_DP) #Removal of TEAM_FIELDING_DP decreases F-stat, 152.7 to 125.8
+fit5 <- update(fit4, .~. - TEAM_FIELDING_DP) #Removal of TEAM_FIELDING_DP (which also has a coefficient opposite the expected sign) decreases F-stat, 153.2 to 170.4
 summary(fit5)
 
 
