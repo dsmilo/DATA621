@@ -50,31 +50,36 @@ It should be noted that the records excluded from the first two rows of the tabl
 
 I then created a linear regression, and created additional, improved regression models by removing predictors with low significance, until the f-statistic of the regression stopped increasing with the removal of predictors. [The f-stats mentioned in the comments may have changed]
 
-```{r}
 dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
-dfremove <- subset(dfraw, INDEX == 1347 | TEAM_BATTING_BB == 0 | TEAM_BATTING_SO < 308 | TEAM_BATTING_SO > 1535 | TEAM_BATTING_HR < 3 | TEAM_BATTING_HR > 264)$INDEX #Identify rows for removal, have zero strikeouts or bases stolen
+dfremove <- subset(dfraw, INDEX == 1347 | TEAM_BATTING_BB == 0 | 
+                     TEAM_BATTING_3B < 11 | TEAM_BATTING_3B > 153 | # http://www.baseball-almanac.com/rb_trip2.shtml
+                     TEAM_BATTING_HR < 3 | TEAM_BATTING_HR > 264 |#http://www.baseball-almanac.com/recbooks/rb_hr7.shtml
+                     TEAM_PITCHING_SO > 1781 | #http://www.baseball-almanac.com/recbooks/rb_strik.shtml
+                     TEAM_BATTING_SO < 308 | TEAM_BATTING_SO > 1535 #http://www.baseball-almanac.com/recbooks/rb_strike2.shtml
+                   )$INDEX 
+length(dfremove)
 df <- subset(dfraw, !(INDEX %in% dfremove))
-df <- df[, -c(1,10,11)] #Remove caught stealing and hit by pitcher variables
+str(df)
+df <- df[, -c(1,10,11,15)] #Remove caught stealing and hit by pitcher variables, and pitching strikeouts.
 #View(df)
 #View(df1)
 summary(df)
 str(df)
 
-fit1 <- lm(TARGET_WINS~.-TEAM_PITCHING_HR-TEAM_BATTING_SO-TEAM_BATTING_H, df)#Non-significant predictors removed
+fit <- lm(TARGET_WINS~.,df)
+summary(fit)
+fit1 <- update(fit, .~.-TEAM_BATTING_H)
 summary(fit1)
-fit2 <- update(fit1, .~. -TEAM_PITCHING_BB) #Removal of TEAM_PITCHING_BB increases F-stat, 123.5 to 134.8
+fit2 <- update(fit1, .~.-TEAM_PITCHING_HR)
 summary(fit2)
-fit3 <- update(fit2, .~. - TEAM_BATTING_2B) #Removal of TEAM_BATTING_2B increases F-stat, 134.8 to 147.1
-summary(fit3)
-fit4 <- update(fit3, .~. - TEAM_PITCHING_H) #Removal of TEAM_PITCHING_H increases F-stat, 147.1 to 152.7
+fit3 <- update(fit2, .~.-TEAM_BATTING_2B)
+summary(fit3) #F stat of 130
+fit4 <- update(fit3, .~.-TEAM_PITCHING_BB) 
 summary(fit4)
-fit5 <- update(fit4, .~. - TEAM_FIELDING_DP) #Removal of TEAM_FIELDING_DP (which also has a coefficient opposite the expected sign) decreases F-stat, 153.2 to 170.4
+fit5 <- update(fit4, .~.-TEAM_PITCHING_H)
 summary(fit5)
-
-
-#Potential stepwise regression - has no effect
-step4 <- step(fit4)
-summary(step4)
+fit6 <- update(fit5, .~.-TEAM_FIELDING_DP) #Wrong sign on predictor Fielding
+summary(fit6)
 
 #Correlation Matrix
 View(round(cor(df1),2))
@@ -84,6 +89,7 @@ df$TEAM_BATTING_1B <- df$TEAM_BATTING_H - df$TEAM_BATTING_2B - df$TEAM_BATTING_3
 df$TEAM_BATTING_HRP <- df$TEAM_BATTING_HR/df$TEAM_BATTING_H #Home runs as a percentage of base hits
 df$TEAM_BATTING_HSO <- df$TEAM_BATTING_H/df$TEAM_BATTING_SO #Ratio of hits to strikeouts
 ```
+
 
 The number of missing values of "TEAM_BATTING_HBP"  is 2085.
 
