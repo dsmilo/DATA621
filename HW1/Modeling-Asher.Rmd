@@ -50,6 +50,7 @@ It should be noted that the records excluded from the first two rows of the tabl
 
 I then created a linear regression, and created additional, improved regression models by removing predictors with low significance, until the f-statistic of the regression stopped increasing with the removal of predictors. [The f-stats mentioned in the comments may have changed]
 
+```{r}
 dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
 dfremove <- subset(dfraw, INDEX == 1347 | TEAM_BATTING_BB == 0 | 
                      TEAM_BATTING_3B < 11 | TEAM_BATTING_3B > 153 | # http://www.baseball-almanac.com/rb_trip2.shtml
