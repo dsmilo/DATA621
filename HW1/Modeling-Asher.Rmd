@@ -20,7 +20,26 @@ Predictor Name | Description | Impact | % Missing Values | Correlation Coefficie
 TEAM_BATTING_HBP | Batters hit by pitch (get a free base) | Positive Impact on Wins | 91.6% | 7% | 31%
 TEAM_BASERUN_CS | Strikeouts by batters | Negative Impact on Wins | 33.9% | 2% | 39%
 
-Including these predictors in our dataset would mean that we would either have to a) forgo a significant chunk of our data (34% or 92%) or impute a large number of data points.  Their correlation coefficients with the response are less than an absolute value of 7%; the p values of a simple one variable linear regression using them and the response yields models of no statistical significance (i.e. p>0.05). Thus, it seems safe to exclude these predictors from our models.
+Including these predictors in our dataset would mean that we would either have to a) forgo a significant chunk of our data (34% or 92%) or b) impute a large number of data points.  Their correlation coefficients with the response are less than an absolute value of 7%; the p values of a simple one variable linear regression using them and the response yields models of no statistical significance (i.e. p>0.05). Thus, it seems safe to exclude these predictors from our models. This way, we avoid the twin pitfalls of mass exclusion and imputation.
+
+Relevant code for checking correlation coefficients and p values:
+
+```{r}
+dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+dfHBP <- dfraw[!is.na(dfraw$TEAM_BATTING_HBP),] #Create df without null values for TEAM_BATTING_HBP
+cor(dfHBP$TARGET_WINS,dfHBP$TEAM_BATTING_HBP)#Calculate correlation coefficient between response and TEAM_BATTING_HBP
+summary(lm(TARGET_WINS~TEAM_BATTING_HBP, dfHBP))#See summary of linear regression model using TEAM_BATTING_HBP
+
+dfCS <- dfraw[!is.na(dfraw$TEAM_BASERUN_CS),]#Create df without null values for TEAM_BASERUN_CS
+cor(dfCS$TARGET_WINS,dfCS$TEAM_BASERUN_CS)#Calculate correlation coefficient between response and TEAM_BASERUN_CS
+summary(lm(TARGET_WINS~TEAM_BASERUN_CS, dfCS))#See summary of linear regression model using TEAM_BASERUN_CS
+```
+
+Further exclusions to the data were made:
+
+Exclusion | Explanation
+|---|---|
+TEAM_BATTING_SO = 0 | There's a gradient of strikeouts until 66, and then it goes directly to zero, which seems suspect
 
 
 
