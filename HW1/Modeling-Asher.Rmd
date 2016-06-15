@@ -9,6 +9,20 @@ summary(trainingDataRaw)
 
 #####Model 1
 
+Description:
+
+The dataset contains 17 columns - an index column (INDEX), a response column (TARGET_WINS) and 15 predictor columns. There are 2,276 observations - but there are many missing values for many of the predictors. 
+
+Two predictors in particular stand out:
+
+Predictor Name | Description | Impact | % Missing Values | Correlation Coefficient with Response | p-value
+TEAM_BATTING_HBP | Batters hit by pitch (get a free base) | Positive Impact on Wins | 91.6% | 7% | 31%
+TEAM_BASERUN_CS | Strikeouts by batters | Negative Impact on Wins | 33.9% | 2% | 39%
+
+Including these predictors in our dataset would mean that we would either have to a) forgo a significant chunk of our data (34% or 92%) or impute a large number of data points.  Their correlation coefficients with the response are less than an absolute value of 7%; the p values of a simple one variable linear regression using them and the response yields models of no statistical significance (i.e. p>0.05). Thus, it seems safe to exclude these predictors from our models.
+
+
+
 ```{r}
 dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
 dfremove <- subset(dfraw, TEAM_BATTING_SO == 0 | TEAM_PITCHING_SO == 0 | TEAM_BASERUN_SB == 0 | TEAM_BATTING_BB == 0 | TEAM_PITCHING_SO > 2500 | TEAM_PITCHING_BB == 0 )$INDEX #Identify rows for removal, have zero strikeouts or bases stolen
