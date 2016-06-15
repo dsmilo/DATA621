@@ -1,0 +1,100 @@
+---
+title: "Homework #1: Baseball Analysis"
+subtitle: "Data 621 Business Analytics and Data Mining"
+author: "Aadi Kalloo, Nathan Lim, Asher Meyers, Daniel Smilowitz, Logan Thomson"
+date: "Due June 19, 2016"
+output: pdf_document
+geometry: margin=0.5in
+---
+
+```{r, echo = FALSE}
+library(stringr)
+library(pander)
+library(knitr)
+
+trainingdata = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/moneyball-training-data.csv")
+####### Mean and Medians Table
+mean_median_df = data.frame(matrix(0, nrow = 17, ncol = 2))
+
+mean2 <- function(x)   {mean(x, na.rm = TRUE)}
+median2 <- function(x) {median(x, na.rm = TRUE)}
+
+means = as.data.frame(lapply(trainingdata, mean2))
+medians = as.data.frame(lapply(trainingdata, median2))
+lengths = as.data.frame(lapply(trainingdata, length))
+
+mean_median_df[, 1] = names(means)
+mean_median_df[, 2] = t(means[1, ])
+mean_median_df[, 3] = t(medians[1, ])
+#mean_median_df[, 4] = t(lengths[1, ])
+
+names(mean_median_df) = c("VAR_NAME", "MEAN", "MEDIAN")
+#kable(mean_median_df, digits = 2)
+####################################################
+
+########Correlations to Wins
+
+cor_df = data.frame(matrix(0, nrow = 15, ncol = 2))
+
+cors = as.data.frame(cor(trainingdata$TARGET_WINS, trainingdata[, 3:17], use = "pairwise.complete.obs"))
+cor_df[, 1] = names(cors)
+cor_df[, 2] = t(cors[1, ])
+
+names(cor_df) = c("VAR_NAME", "CORRELATION TO WINS (r)")
+
+#kable(cor_df, digits = 2)
+####################################################
+
+########Missing Values per variable
+mv_df = data.frame(matrix(0, nrow = 17, ncol = 2))
+
+num_missing <- function(x)   {sum(is.na(x))}
+
+
+missingvalues = as.data.frame(lapply(trainingdata, num_missing))
+mv_df[, 1] = names(missingvalues)
+mv_df[, 2] = t(missingvalues[1, ])
+
+names(mv_df) = c("VAR_NAME", "NUM_MISSING")
+
+#kable(mv_df, digits = 2)
+####################################################
+
+
+data_exp = merge(mean_median_df, cor_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
+data_exp = merge(data_exp, mv_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
+temp = as.data.frame(cbind(mean_median_df[2,], NA, NA))
+names(temp) = names(data_exp)
+data_exp = rbind(temp, data_exp)
+```
+
+
+
+#Data Exploration
+
+The data analyzed in this report includes 2276 professional baseball teams for the years 1871-2006. In total, 16 variables were present in the data provided. Included below is a summary of descriptive statistics, correlations to wins, and the number of missing values for each variable in the provided data set:
+
+```{r, echo = FALSE}
+kable(data_exp)
+```
+
+Below are graphs that show the relationship to _Target Wins_ for the three variables with the highest correlation coefficient: 
+
+```{r, echo = FALSE}
+par(mfrow = c(1, 3))
+top3correlations = c(0,0,7,4,0,0,6)
+for (plot_count in c(3, 4, 7)) {
+  plot(x = trainingdata[, plot_count], y = trainingdata$TARGET_WINS, xlab = names(trainingdata)[plot_count], ylab = "Target Wins", main = paste0(names(trainingdata)[plot_count], " r = ", round(data_exp[top3correlations[plot_count], 4], 3) ))
+}
+```
+
+The full array of correlations graphs may be found in Appendix A. 
+<!-- -->
+
+#Data Preparation
+
+It was determined that the _Hits By Pitch_ variable had too many missing values to be useful for regression, and thus this variable was excluded from the model building process.  
+
+#Model Creation
+
+#Model Selection and Prediction
