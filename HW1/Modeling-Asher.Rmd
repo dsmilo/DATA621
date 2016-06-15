@@ -48,6 +48,7 @@ TEAM_PITCHING_SO | Outside of recognized records [link](http://www.baseball-alma
 
 It should be noted that the records excluded from the first two rows of the table above are the same exact points (which would technically make the second exclusion redundant...). That suggests that for whatever reason, strikeouts were not recorded for those rows, but were marked as zero. Those two predictors have the same number of NA values, 102, suggesting their recording method was linked somehow.
 
+I then created a linear regression, and iterated by removing predictors with low significance, until the f-statistic of the regression stopped increasing with the removal of predictors. [The f-stats mentioned in the comments may have changed]
 
 ```{r}
 dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
@@ -58,8 +59,6 @@ df <- df[, -c(1,10,11)] #Remove caught stealing and hit by pitcher variables
 #View(df1)
 summary(df)
 str(df)
-
-View(df[!df %in% boxplot.stats(df)$out])
 
 fit1 <- lm(TARGET_WINS~.-TEAM_PITCHING_HR-TEAM_BATTING_SO-TEAM_BATTING_H, df)#Non-significant predictors removed
 summary(fit1)
@@ -88,6 +87,7 @@ df$TEAM_BATTING_1B <- df$TEAM_BATTING_H - df$TEAM_BATTING_2B - df$TEAM_BATTING_3
 df$TEAM_BATTING_HRP <- df$TEAM_BATTING_HR/df$TEAM_BATTING_H #Home runs as a percentage of base hits
 df$TEAM_BATTING_HSO <- df$TEAM_BATTING_H/df$TEAM_BATTING_SO #Ratio of hits to strikeouts
 ```
+
 The number of missing values of "TEAM_BATTING_HBP"  is 2085.
 
 #####Imputing Missing values
