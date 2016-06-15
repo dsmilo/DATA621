@@ -97,4 +97,92 @@ It was determined that the _Hits By Pitch_ variable had too many missing values 
 
 #Model Creation
 
+#####Load Data
+
+```{r, echo = FALSE}
+trainingDataRaw = trainingdata
+trainingDataRaw <- trainingDataRaw[,c(2:17)] # delete index
+```
+
+#####Model 1
+
+```{r}
+#dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+dfraw = trainingdata
+dfremove <- subset(dfraw, TEAM_BATTING_SO == 0 | TEAM_PITCHING_SO == 0 | TEAM_BASERUN_SB == 0 | TEAM_BATTING_BB == 0 | TEAM_PITCHING_SO > 2500 | TEAM_PITCHING_BB == 0 )$INDEX #Identify rows for removal, have zero strikeouts or bases stolen
+df <- subset(dfraw, !(INDEX %in% dfremove))
+df1 <- df[, -c(1,10,11)] #Remove caught stealing and hit by pitcher variables
+#View(df)
+#View(df1)
+#summary(df)
+
+df$TEAM_BATTING_HSO <- df$TEAM_BATTING_H/df$TEAM_BATTING_SO #Ratio of hits to strikeouts
+
+fit1 <- lm(TARGET_WINS~.-TEAM_PITCHING_HR-TEAM_BATTING_SO-TEAM_BATTING_H, df)#Non-significant predictors removed
+summary(fit1)
+step1 <- step(fit1)
+summary(step1)
+
+#Correlation Matrix
+#View(round(cor(df1),2))
+
+#These are variables that I tried but didn't turn out to be valuable
+df1$TEAM_BATTING_1B <- df1$TEAM_BATTING_H - df1$TEAM_BATTING_2B - df1$TEAM_BATTING_3B - df1$TEAM_BATTING_HR #Singles - 1st Base Hits
+df1$TEAM_BATTING_HRP <- df1$TEAM_BATTING_HR/df1$TEAM_BATTING_H #Home runs as a percentage of base hits
+```
+
+#####Imputing Missing values
+```{r, echo = FALSE, results='hide'}
+library(mice)
+tempData <- mice(trainingDataRaw,m=5,maxit=50,meth='pmm',seed=500)
+#summary(tempData)
+
+new_data <- complete(tempData, 1)
+#summary(new_data)
+#View(cor(new_data))
+```
+
+#####Create a linear model using all predictors. The INDEX column is excluded.
+```{r}
+FullModel <- lm(TARGET_WINS ~.-INDEX, trainingdata)
+summary(FullModel) #Summary of full model
+```
+
+
+#####Put full model through stepwise regression, where predictors with less significance are sequentially removed.
+```{r}
+stepFull <- step(FullModel) 
+summary(stepFull)
+
+```
+
+
+```{r}
+#####Generate predictions using the stepFull model
+predictionsStepFull <- predict(stepFull, trainingDataRaw) 
+#View(predictionsStepFull)
+```
+
+#####Generate the RMSE of the stepFull model
+```{r}
+rmseStep <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepFull)] - predictionsStepFull[!is.na(predictionsStepFull)])^2)) 
+rmseStep
+```
+
+```{r}
+par(mfrow=c(2,2)) #Set up a four panel plot for evaluating regression
+plot(stepFull) #Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
+```
+
+#####Evaluation of Stepwise model without TEAM_BATTING_HBP
+```{r}
+trainingDataRaw = trainingdata
+ReducedModel <- lm(TARGET_WINS ~., trainingDataRaw[,c(2:10, 12:17)])
+summary(ReducedModel)
+stepReduced <- step(ReducedModel)
+predictionsStepReduced <- predict(stepReduced, trainingDataRaw[,c(2:10, 12:17)])
+rmseStepR <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepReduced)] - predictionsStepReduced[!is.na(predictionsStepReduced)])^2))
+rmseStepR
+```
+
 #Model Selection and Prediction
