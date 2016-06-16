@@ -146,12 +146,8 @@ par(mfrow=c(2,2)); plot(model2)
 par(mfrow=c(1,1)); plot(model2$residuals)
 summary(model2)
 
-
-df_new$residuals <- model2$residuals
-df_new$predicted <- model2$fitted.values
-
-ggplot(df_new, aes(x=TARGET_WINS, y=predicted)) +
-  geom_point() + stat_smooth(method="lm")
+plot(fitted(model2), residuals(model2))
+abline(h=0, col='red')
 
 ```
 
