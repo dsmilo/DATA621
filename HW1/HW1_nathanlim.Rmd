@@ -7,7 +7,7 @@ str(raw_data)
 summary(raw_data)
 ```
 
-The number of missing values of "TEAM_BATTING_HBP"  is 2085.
+#Delete rows pitching so count bigger than 5832
 
 ```{r}
 df = raw_data[-which(raw_data$TEAM_PITCHING_SO>=5832),]
@@ -19,25 +19,18 @@ for (i in 1:16){
 df[,i][is.na(df[,i])] <-  median(df[,i], na.rm = TRUE)
 }
 
-summary(df)
-View(cor(df))
-hist(df$TARGET_WINS)
-
-
-
-
 ```
 
 
 # Remove outliers
 ```{r}
 new_df=df
+library(dplyr)
 
-library(outliers)
 for (i in 1:16){
-outliers = which(outlier(test_df[,i],logical=TRUE))
-new_df = new_df[-outliers,] 
+outliers[i] <- which(new_df[,i] > mean(new_df[,i], na.rm=TRUE) + 3*sd(new_df[,i], na.rm=TRUE))
 }
+
 
 str(new_df)
 
@@ -45,11 +38,12 @@ str(new_df)
 
 
 ```{r}
-fitall <- lm(TARGET_WINS ~. , new_df)
+fitall <- lm(TARGET_WINS ~. , df)
 summary(fitall)
 
 model<- lm(TARGET_WINS ~  sqrt(TEAM_BATTING_H)+TEAM_PITCHING_H, new_df)
 plot(model)
+plot(model$residuals)
 
 
 df_predict <- data.frame(cbind(original=df$TARGET_WINS, predicted=predict(fitall, df)))

@@ -11,6 +11,8 @@ geometry: margin=0.5in
 library(stringr)
 library(pander)
 library(knitr)
+library(ggplot2)
+library(gridExtra)
 
 trainingdata = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/moneyball-training-data.csv")
 ####### Mean and Medians Table
@@ -101,8 +103,62 @@ It was determined that the _Hits By Pitch_ variable had too many missing values 
 
 ```{r, echo = FALSE}
 trainingDataRaw = trainingdata
-trainingDataRaw <- trainingDataRaw[,c(2:17)] # delete index
+data_no_index <- trainingDataRaw[,c(2:17)] # delete index
 ```
+
+
+#####Imputing Missing values with median
+```{r}
+for (i in 1:16){
+data_no_index[,i][is.na(data_no_index[,i])] <-  median(data_no_index[,i], na.rm = TRUE)
+}
+df_new=data_no_index
+summary(df_new)
+```
+
+
+####Use all the variables to see p value of each variables.
+```{r}
+fit_all <- lm(TARGET_WINS ~ . , df_new)
+summary(fit_all)
+```
+
+
+
+
+
+
+
+
+
+####Model --(Nathan)
+
+```{r}
+
+g1 <- ggplot(df_new, aes(x=TEAM_FIELDING_E)) + geom_histogram(binwidth = 10)
+g2 <- ggplot(df_new, aes(x=log(TEAM_FIELDING_E))) + geom_histogram(binwidth = 0.05)
+grid.arrange(g1, g2, ncol=2)
+
+model2<- lm(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB + TEAM_FIELDING_DP + 
+              log(TEAM_FIELDING_E), df_new)
+
+par(mfrow=c(2,2)); plot(model2)
+par(mfrow=c(1,1)); plot(model2$residuals)
+summary(model2)
+
+
+df_new$residuals <- model2$residuals
+df_new$predicted <- model2$fitted.values
+
+ggplot(df_new, aes(x=TARGET_WINS, y=predicted)) +
+  geom_point() + stat_smooth(method="lm")
+
+```
+
+
+
+
+
 
 #####Model 1
 
@@ -111,6 +167,7 @@ trainingDataRaw <- trainingDataRaw[,c(2:17)] # delete index
 dfraw = trainingdata
 dfremove <- subset(dfraw, TEAM_BATTING_SO == 0 | TEAM_PITCHING_SO == 0 | TEAM_BASERUN_SB == 0 | TEAM_BATTING_BB == 0 | TEAM_PITCHING_SO > 2500 | TEAM_PITCHING_BB == 0 )$INDEX #Identify rows for removal, have zero strikeouts or bases stolen
 df <- subset(dfraw, !(INDEX %in% dfremove))
+head(df)
 df1 <- df[, -c(1,10,11)] #Remove caught stealing and hit by pitcher variables
 #View(df)
 #View(df1)
@@ -131,16 +188,6 @@ df1$TEAM_BATTING_1B <- df1$TEAM_BATTING_H - df1$TEAM_BATTING_2B - df1$TEAM_BATTI
 df1$TEAM_BATTING_HRP <- df1$TEAM_BATTING_HR/df1$TEAM_BATTING_H #Home runs as a percentage of base hits
 ```
 
-#####Imputing Missing values
-```{r, echo = FALSE, results='hide'}
-library(mice)
-tempData <- mice(trainingDataRaw,m=5,maxit=50,meth='pmm',seed=500)
-#summary(tempData)
-
-new_data <- complete(tempData, 1)
-#summary(new_data)
-#View(cor(new_data))
-```
 
 #####Create a linear model using all predictors. The INDEX column is excluded.
 ```{r}
