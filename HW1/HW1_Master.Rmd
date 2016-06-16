@@ -159,48 +159,131 @@ ggplot(df_new, aes(x=TARGET_WINS, y=predicted)) +
 
 
 
-
 #####Model 1
+
+Description:
+
+The dataset contains 17 columns - an index column (INDEX), a response column (TARGET_WINS) and 15 predictor columns. There are 2,276 observations - but there are many missing values for many of the predictors. 
+
+Two predictors in particular stand out:
+```{r}
+a = c("TEAM_BATTING_HBP", "Batters hit by pitch (free base)", "Positive", "91.6%", "7%", "31%")
+b = c("TEAM_BASERUN_CS", "Strikeouts by batters", "Negative", "33.9%", "2%", "39%")
+
+names(a) = c("Predictor Name", "Description", "Impact", "% Missing", "r with Response", "p-Value")
+names(b) = names(a)
+c = as.data.frame(rbind(a, b))
+kable(c)
+```
+
+
+
+Including these predictors in our dataset would mean that we would either have to a) forgo a significant chunk of our data (34% or 92%) or b) impute a large number of data points.  Their correlation coefficients with the response are less than an absolute value of 7%; the p values of a simple one variable linear regression using them and the response yields models of no statistical significance (i.e. p>0.05). Thus, it seems safe to exclude these predictors from our models. This way, we avoid the twin pitfalls of mass exclusion and imputation.
+
+Relevant code for checking correlation coefficients and p values:
 
 ```{r}
 #dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
 dfraw = trainingdata
-dfremove <- subset(dfraw, TEAM_BATTING_SO == 0 | TEAM_PITCHING_SO == 0 | TEAM_BASERUN_SB == 0 | TEAM_BATTING_BB == 0 | TEAM_PITCHING_SO > 2500 | TEAM_PITCHING_BB == 0 )$INDEX #Identify rows for removal, have zero strikeouts or bases stolen
+dfHBP <- dfraw[!is.na(dfraw$TEAM_BATTING_HBP),] #Create df without null values for TEAM_BATTING_HBP
+cor(dfHBP$TARGET_WINS,dfHBP$TEAM_BATTING_HBP)#Calculate correlation coefficient between response and TEAM_BATTING_HBP
+summary(lm(TARGET_WINS~TEAM_BATTING_HBP, dfHBP))#See summary of linear regression model using TEAM_BATTING_HBP
+
+dfCS <- dfraw[!is.na(dfraw$TEAM_BASERUN_CS),]#Create df without null values for TEAM_BASERUN_CS
+cor(dfCS$TARGET_WINS,dfCS$TEAM_BASERUN_CS)#Calculate correlation coefficient between response and TEAM_BASERUN_CS
+summary(lm(TARGET_WINS~TEAM_BASERUN_CS, dfCS))#See summary of linear regression model using TEAM_BASERUN_CS
+```
+
+Further exclusions to the data were made:
+
+Exclusion | Explanation
+---------------------------|---------------------------------------------
+INDEX == 1347 | This row had a suspicious set of zero entries
+TEAM_BATTING_BB == 0 | Anomalously low walk count (expected occurences of a zero value for this predictor are zero)
+TEAM_BATTING_SO | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_strike2.shtml)
+TEAM_BATTING_HR | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_hr7.shtml)
+
+
+
+It should be noted that the records excluded from the first two rows of the table above are the same exact points (which would technically make the second exclusion redundant...). That suggests that for whatever reason, strikeouts were not recorded for those rows, but were marked as zero. Those two predictors have the same number of NA values, 102, suggesting their recording method was linked somehow.
+
+I then created a linear regression, and created additional, improved regression models by removing predictors with low significance, until the f-statistic of the regression stopped increasing with the removal of predictors. [The f-stats mentioned in the comments may have changed]
+
+```{r}
+#dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+dfraw = trainingdata
+dfremove <- subset(dfraw, INDEX == 1347 | TEAM_BATTING_BB == 0 | 
+                     TEAM_BATTING_3B < 11 | TEAM_BATTING_3B > 153 | # http://www.baseball-almanac.com/rb_trip2.shtml
+                     TEAM_BATTING_HR < 3 | TEAM_BATTING_HR > 264 |#http://www.baseball-almanac.com/recbooks/rb_hr7.shtml
+                     TEAM_PITCHING_SO > 1781 | #http://www.baseball-almanac.com/recbooks/rb_strik.shtml
+                     TEAM_BATTING_SO < 308 | TEAM_BATTING_SO > 1535 #http://www.baseball-almanac.com/recbooks/rb_strike2.shtml
+                   )$INDEX 
+length(dfremove)
 df <- subset(dfraw, !(INDEX %in% dfremove))
-head(df)
-df1 <- df[, -c(1,10,11)] #Remove caught stealing and hit by pitcher variables
+#str(df)
+df <- df[, -c(1,10,11,15)] #Remove caught stealing and hit by pitcher variables, and pitching strikeouts.
 #View(df)
 #View(df1)
-#summary(df)
+summary(df)
+str(df)
 
-df$TEAM_BATTING_HSO <- df$TEAM_BATTING_H/df$TEAM_BATTING_SO #Ratio of hits to strikeouts
-
-fit1 <- lm(TARGET_WINS~.-TEAM_PITCHING_HR-TEAM_BATTING_SO-TEAM_BATTING_H, df)#Non-significant predictors removed
+fit <- lm(TARGET_WINS~.,df)
+summary(fit)
+fit1 <- update(fit, .~.-TEAM_BATTING_H)
 summary(fit1)
-step1 <- step(fit1)
-summary(step1)
+fit2 <- update(fit1, .~.-TEAM_PITCHING_HR)
+summary(fit2)
+fit3 <- update(fit2, .~.-TEAM_BATTING_2B)
+summary(fit3) #F stat of 130
+fit4 <- update(fit3, .~.-TEAM_PITCHING_BB) 
+summary(fit4)
+fit5 <- update(fit4, .~.-TEAM_PITCHING_H)
+summary(fit5)
+fit6 <- update(fit5, .~.-TEAM_FIELDING_DP) #Wrong sign on predictor Fielding
+summary(fit6)
 
 #Correlation Matrix
-#View(round(cor(df1),2))
+#View(round(cor(df), 2))
 
 #These are variables that I tried but didn't turn out to be valuable
-df1$TEAM_BATTING_1B <- df1$TEAM_BATTING_H - df1$TEAM_BATTING_2B - df1$TEAM_BATTING_3B - df1$TEAM_BATTING_HR #Singles - 1st Base Hits
-df1$TEAM_BATTING_HRP <- df1$TEAM_BATTING_HR/df1$TEAM_BATTING_H #Home runs as a percentage of base hits
+df$TEAM_BATTING_1B <- df$TEAM_BATTING_H - df$TEAM_BATTING_2B - df$TEAM_BATTING_3B - df$TEAM_BATTING_HR #Singles - 1st Base Hits
+df$TEAM_BATTING_HRP <- df$TEAM_BATTING_HR/df$TEAM_BATTING_H #Home runs as a percentage of base hits
+df$TEAM_BATTING_HSO <- df$TEAM_BATTING_H/df$TEAM_BATTING_SO #Ratio of hits to strikeouts
 ```
+
+
+#####Imputing Missing values
+```{r}
+# library(mice)
+# tempData <- mice(trainingDataRaw,m=5,maxit=50,meth='pmm',seed=500)
+# summary(tempData)
+# 
+# new_data <- complete(tempData, 1)
+# summary(new_data)
+# View(cor(new_data))
+
+
+
+```
+
+
+
+
+
 
 
 #####Create a linear model using all predictors. The INDEX column is excluded.
+
 ```{r}
-FullModel <- lm(TARGET_WINS ~.-INDEX, trainingdata)
+FullModel <- lm(TARGET_WINS ~.-INDEX, trainingDataRaw)
 summary(FullModel) #Summary of full model
 ```
 
-
 #####Put full model through stepwise regression, where predictors with less significance are sequentially removed.
+
 ```{r}
 stepFull <- step(FullModel) 
 summary(stepFull)
-
 ```
 
 
@@ -223,7 +306,6 @@ plot(stepFull) #Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
 
 #####Evaluation of Stepwise model without TEAM_BATTING_HBP
 ```{r}
-trainingDataRaw = trainingdata
 ReducedModel <- lm(TARGET_WINS ~., trainingDataRaw[,c(2:10, 12:17)])
 summary(ReducedModel)
 stepReduced <- step(ReducedModel)
