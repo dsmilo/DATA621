@@ -15,59 +15,65 @@ library(ggplot2)
 library(gridExtra)
 
 trainingdata = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/moneyball-training-data.csv")
-####### Mean and Medians Table
-mean_median_df = data.frame(matrix(0, nrow = 17, ncol = 2))
 
-mean2 <- function(x)   {mean(x, na.rm = TRUE)}
-median2 <- function(x) {median(x, na.rm = TRUE)}
+createSummaryTable <- function(trainingdata1) {
+  ####### Mean and Medians Table
+  mean_median_df = data.frame(matrix(0, nrow = ncol(trainingdata1), ncol = 2))
+  
+  mean2 <- function(x)   {mean(x, na.rm = TRUE)}
+  median2 <- function(x) {median(x, na.rm = TRUE)}
+  
+  means = as.data.frame(lapply(trainingdata1, mean2))
+  medians = as.data.frame(lapply(trainingdata1, median2))
+  lengths = as.data.frame(lapply(trainingdata1, length))
+  
+  mean_median_df[, 1] = names(means)
+  mean_median_df[, 2] = t(means[1, ])
+  mean_median_df[, 3] = t(medians[1, ])
+  #mean_median_df[, 4] = t(lengths[1, ])
+  
+  names(mean_median_df) = c("VAR_NAME", "MEAN", "MEDIAN")
+  #kable(mean_median_df, digits = 2)
+  ####################################################
+  
+  ########Correlations to Wins
+  
+  cor_df = data.frame(matrix(0, nrow = ncol(trainingdata1) - 2, ncol = 2))
+  
+  cors = as.data.frame(cor(trainingdata1$TARGET_WINS, trainingdata1[, 3:ncol(trainingdata1)], use = "pairwise.complete.obs"))
+  cor_df[, 1] = names(cors)
+  cor_df[, 2] = t(cors[1, ])
+  
+  names(cor_df) = c("VAR_NAME", "CORRELATION TO WINS (r)")
+  
+  #kable(cor_df, digits = 2)
+  ####################################################
+  
+  ########Missing Values per variable
+  mv_df = data.frame(matrix(0, nrow = ncol(trainingdata1), ncol = 2))
+  
+  num_missing <- function(x)   {sum(is.na(x))}
+  
+  
+  missingvalues = as.data.frame(lapply(trainingdata1, num_missing))
+  mv_df[, 1] = names(missingvalues)
+  mv_df[, 2] = t(missingvalues[1, ])
+  
+  names(mv_df) = c("VAR_NAME", "NUM_MISSING")
+  
+  #kable(mv_df, digits = 2)
+  ####################################################
+  
+  
+  data_exp = merge(mean_median_df, cor_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
+  data_exp = merge(data_exp, mv_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
+  temp = as.data.frame(cbind(mean_median_df[2,], NA, NA))
+  names(temp) = names(data_exp)
+  data_exp = rbind(temp, data_exp)
+}
 
-means = as.data.frame(lapply(trainingdata, mean2))
-medians = as.data.frame(lapply(trainingdata, median2))
-lengths = as.data.frame(lapply(trainingdata, length))
 
-mean_median_df[, 1] = names(means)
-mean_median_df[, 2] = t(means[1, ])
-mean_median_df[, 3] = t(medians[1, ])
-#mean_median_df[, 4] = t(lengths[1, ])
-
-names(mean_median_df) = c("VAR_NAME", "MEAN", "MEDIAN")
-#kable(mean_median_df, digits = 2)
-####################################################
-
-########Correlations to Wins
-
-cor_df = data.frame(matrix(0, nrow = 15, ncol = 2))
-
-cors = as.data.frame(cor(trainingdata$TARGET_WINS, trainingdata[, 3:17], use = "pairwise.complete.obs"))
-cor_df[, 1] = names(cors)
-cor_df[, 2] = t(cors[1, ])
-
-names(cor_df) = c("VAR_NAME", "CORRELATION TO WINS (r)")
-
-#kable(cor_df, digits = 2)
-####################################################
-
-########Missing Values per variable
-mv_df = data.frame(matrix(0, nrow = 17, ncol = 2))
-
-num_missing <- function(x)   {sum(is.na(x))}
-
-
-missingvalues = as.data.frame(lapply(trainingdata, num_missing))
-mv_df[, 1] = names(missingvalues)
-mv_df[, 2] = t(missingvalues[1, ])
-
-names(mv_df) = c("VAR_NAME", "NUM_MISSING")
-
-#kable(mv_df, digits = 2)
-####################################################
-
-
-data_exp = merge(mean_median_df, cor_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
-data_exp = merge(data_exp, mv_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
-temp = as.data.frame(cbind(mean_median_df[2,], NA, NA))
-names(temp) = names(data_exp)
-data_exp = rbind(temp, data_exp)
+trainingdata_bk = trainingdata
 ```
 
 
@@ -77,6 +83,7 @@ data_exp = rbind(temp, data_exp)
 The data analyzed in this report includes 2276 professional baseball teams for the years 1871-2006. In total, 16 variables were present in the data provided. Included below is a summary of descriptive statistics, correlations to wins, and the number of missing values for each variable in the provided data set:
 
 ```{r, echo = FALSE}
+data_exp = createSummaryTable(trainingdata)
 kable(data_exp)
 ```
 
@@ -95,41 +102,65 @@ The full array of correlations graphs may be found in Appendix A.
 
 #Data Preparation
 
-It was determined that the _Hits By Pitch_ variable had too many missing values to be useful for regression, and thus this variable was excluded from the model building process.  
+It was determined that the _Hits By Pitch_ variable had too many missing values to be useful for regression, and thus this variable was excluded from the model building process. As shown in Table 1 above, there are several variables that have missing values. The attempted solution to this problem involved imputation using the median for each variable in the data set. A summary of the data is shown here again for inspection and confirmation of similarity between the old and new data sets:
+
+
+#####Missing Values Imputed With Median
+```{r, echo = FALSE}
+trainingDataRaw = trainingdata
+data_no_index <- trainingDataRaw#[,c(2:17)] # delete index
+
+for (i in 2:17) {
+  data_no_index[,i][is.na(data_no_index[,i])] = median(data_no_index[,i], na.rm = TRUE)
+}
+
+df_new=data_no_index
+#summary(df_new)
+imp_data = createSummaryTable(df_new)
+kable(imp_data)
+trainingdata = df_new
+```
+
+The dataset contains 17 columns - an index column (INDEX), a response column (TARGET_WINS) and 15 predictor columns. There are 2,276 observations - but there are many missing values for many of the predictors. 
+
+Two predictors in particular stand out:
+```{r, echo = FALSE}
+a = c("TEAM_BATTING_HBP", "Batters hit by pitch (free base)", "Positive", "91.6%", "7%", "31%")
+b = c("TEAM_BASERUN_CS", "Strikeouts by batters", "Negative", "33.9%", "2%", "39%")
+
+names(a) = c("Predictor Name", "Description", "Impact", "% Missing", "r with Response", "p-Value")
+names(b) = names(a)
+c = as.data.frame(rbind(a, b))
+kable(c)
+```
+
+Including these predictors in our dataset would mean that we would either have to a) forgo a significant chunk of our data (34% or 92%) or b) impute a large number of data points.  Their correlation coefficients with the response are less than an absolute value of 7%; the p values of a simple one variable linear regression using them and the response yields models of no statistical significance (i.e. p > 0.05). Thus, it seems safe to exclude these predictors from our models. This way, we avoid the twin pitfalls of mass exclusion and imputation.
+
+Further exclusions to the data were made:
+
+Exclusion | Explanation
+---------------------------|---------------------------------------------
+INDEX == 1347 | This row had a suspicious set of zero entries
+TEAM_BATTING_BB == 0 | Anomalously low walk count (expected occurences of a zero value for this predictor are zero)
+TEAM_BATTING_SO | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_strike2.shtml)
+TEAM_BATTING_HR | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_hr7.shtml)
+
+It should be noted that the records excluded from the first two rows of the table above are the same exact points (which would technically make the second exclusion redundant...). That suggests that for whatever reason, strikeouts were not recorded for those rows, but were marked as zero. Those two predictors have the same number of NA values, 102, suggesting their recording method was linked somehow.
 
 #Model Creation
 
-#####Load Data
-
 ```{r, echo = FALSE}
+##### LOAD DATA
+
 trainingDataRaw = trainingdata
-data_no_index <- trainingDataRaw[,c(2:17)] # delete index
+data_no_index = trainingDataRaw[,c(2:17)] # delete index
 ```
-
-
-#####Imputing Missing values with median
-```{r}
-for (i in 1:16){
-data_no_index[,i][is.na(data_no_index[,i])] <-  median(data_no_index[,i], na.rm = TRUE)
-}
-df_new=data_no_index
-summary(df_new)
-```
-
 
 ####Use all the variables to see p value of each variables.
 ```{r}
 fit_all <- lm(TARGET_WINS ~ . , df_new)
 summary(fit_all)
 ```
-
-
-
-
-
-
-
-
 
 ####Model --(Nathan)
 
@@ -163,22 +194,7 @@ ggplot(df_new, aes(x=TARGET_WINS, y=predicted)) +
 
 Description:
 
-The dataset contains 17 columns - an index column (INDEX), a response column (TARGET_WINS) and 15 predictor columns. There are 2,276 observations - but there are many missing values for many of the predictors. 
 
-Two predictors in particular stand out:
-```{r}
-a = c("TEAM_BATTING_HBP", "Batters hit by pitch (free base)", "Positive", "91.6%", "7%", "31%")
-b = c("TEAM_BASERUN_CS", "Strikeouts by batters", "Negative", "33.9%", "2%", "39%")
-
-names(a) = c("Predictor Name", "Description", "Impact", "% Missing", "r with Response", "p-Value")
-names(b) = names(a)
-c = as.data.frame(rbind(a, b))
-kable(c)
-```
-
-
-
-Including these predictors in our dataset would mean that we would either have to a) forgo a significant chunk of our data (34% or 92%) or b) impute a large number of data points.  Their correlation coefficients with the response are less than an absolute value of 7%; the p values of a simple one variable linear regression using them and the response yields models of no statistical significance (i.e. p>0.05). Thus, it seems safe to exclude these predictors from our models. This way, we avoid the twin pitfalls of mass exclusion and imputation.
 
 Relevant code for checking correlation coefficients and p values:
 
@@ -186,26 +202,13 @@ Relevant code for checking correlation coefficients and p values:
 #dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
 dfraw = trainingdata
 dfHBP <- dfraw[!is.na(dfraw$TEAM_BATTING_HBP),] #Create df without null values for TEAM_BATTING_HBP
-cor(dfHBP$TARGET_WINS,dfHBP$TEAM_BATTING_HBP)#Calculate correlation coefficient between response and TEAM_BATTING_HBP
+paste0("correlation coefficient between response and TEAM_BATTING_HBP: ", cor(dfHBP$TARGET_WINS,dfHBP$TEAM_BATTING_HBP)) #Calculate correlation coefficient between response and TEAM_BATTING_HBP
 summary(lm(TARGET_WINS~TEAM_BATTING_HBP, dfHBP))#See summary of linear regression model using TEAM_BATTING_HBP
 
 dfCS <- dfraw[!is.na(dfraw$TEAM_BASERUN_CS),]#Create df without null values for TEAM_BASERUN_CS
-cor(dfCS$TARGET_WINS,dfCS$TEAM_BASERUN_CS)#Calculate correlation coefficient between response and TEAM_BASERUN_CS
+paste0("correlation coefficient between response and TEAM_BASERUN_CS: ", cor(dfCS$TARGET_WINS,dfCS$TEAM_BASERUN_CS)) #Calculate correlation coefficient between response and TEAM_BASERUN_CS
 summary(lm(TARGET_WINS~TEAM_BASERUN_CS, dfCS))#See summary of linear regression model using TEAM_BASERUN_CS
 ```
-
-Further exclusions to the data were made:
-
-Exclusion | Explanation
----------------------------|---------------------------------------------
-INDEX == 1347 | This row had a suspicious set of zero entries
-TEAM_BATTING_BB == 0 | Anomalously low walk count (expected occurences of a zero value for this predictor are zero)
-TEAM_BATTING_SO | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_strike2.shtml)
-TEAM_BATTING_HR | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_hr7.shtml)
-
-
-
-It should be noted that the records excluded from the first two rows of the table above are the same exact points (which would technically make the second exclusion redundant...). That suggests that for whatever reason, strikeouts were not recorded for those rows, but were marked as zero. Those two predictors have the same number of NA values, 102, suggesting their recording method was linked somehow.
 
 I then created a linear regression, and created additional, improved regression models by removing predictors with low significance, until the f-statistic of the regression stopped increasing with the removal of predictors. [The f-stats mentioned in the comments may have changed]
 
@@ -218,14 +221,14 @@ dfremove <- subset(dfraw, INDEX == 1347 | TEAM_BATTING_BB == 0 |
                      TEAM_PITCHING_SO > 1781 | #http://www.baseball-almanac.com/recbooks/rb_strik.shtml
                      TEAM_BATTING_SO < 308 | TEAM_BATTING_SO > 1535 #http://www.baseball-almanac.com/recbooks/rb_strike2.shtml
                    )$INDEX 
-length(dfremove)
+#length(dfremove)
 df <- subset(dfraw, !(INDEX %in% dfremove))
 #str(df)
 df <- df[, -c(1,10,11,15)] #Remove caught stealing and hit by pitcher variables, and pitching strikeouts.
 #View(df)
 #View(df1)
-summary(df)
-str(df)
+#summary(df)
+#str(df)
 
 fit <- lm(TARGET_WINS~.,df)
 summary(fit)
@@ -250,26 +253,6 @@ df$TEAM_BATTING_1B <- df$TEAM_BATTING_H - df$TEAM_BATTING_2B - df$TEAM_BATTING_3
 df$TEAM_BATTING_HRP <- df$TEAM_BATTING_HR/df$TEAM_BATTING_H #Home runs as a percentage of base hits
 df$TEAM_BATTING_HSO <- df$TEAM_BATTING_H/df$TEAM_BATTING_SO #Ratio of hits to strikeouts
 ```
-
-
-#####Imputing Missing values
-```{r}
-# library(mice)
-# tempData <- mice(trainingDataRaw,m=5,maxit=50,meth='pmm',seed=500)
-# summary(tempData)
-# 
-# new_data <- complete(tempData, 1)
-# summary(new_data)
-# View(cor(new_data))
-
-
-
-```
-
-
-
-
-
 
 
 #####Create a linear model using all predictors. The INDEX column is excluded.
