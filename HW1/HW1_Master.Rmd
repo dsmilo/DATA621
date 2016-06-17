@@ -108,9 +108,9 @@ It was determined that the _Hits By Pitch_ variable had too many missing values 
 #####Missing Values Imputed With Median
 ```{r, echo = FALSE}
 trainingDataRaw = trainingdata
-data_no_index <- trainingDataRaw#[,c(2:17)] # delete index
+data_no_index <- trainingDataRaw[,c(2:17)] # delete index
 
-for (i in 2:17) {
+for (i in 1:16) {
   data_no_index[,i][is.na(data_no_index[,i])] = median(data_no_index[,i], na.rm = TRUE)
 }
 
@@ -125,8 +125,8 @@ The dataset contains 17 columns - an index column (INDEX), a response column (TA
 
 Two predictors in particular stand out:
 ```{r, echo = FALSE}
-a = c("TEAM_BATTING_HBP", "Batters hit by pitch (free base)", "Positive", "91.6%", "7%", "31%")
-b = c("TEAM_BASERUN_CS", "Strikeouts by batters", "Negative", "33.9%", "2%", "39%")
+a = c("TEAM_BATTING_HBP", "Batters hit by pitch (free base)", "Positive", "91.6%", "7%", "0.31")
+b = c("TEAM_BASERUN_CS", "Strikeouts by batters", "Negative", "33.9%", "2%", "0.39")
 
 names(a) = c("Predictor Name", "Description", "Impact", "% Missing", "r with Response", "p-Value")
 names(b) = names(a)
@@ -152,14 +152,8 @@ It should be noted that the records excluded from the first two rows of the tabl
 ```{r, echo = FALSE}
 ##### LOAD DATA
 
-trainingDataRaw = trainingdata
-data_no_index = trainingDataRaw[,c(2:17)] # delete index
-```
-
-####Use all the variables to see p value of each variables.
-```{r}
-fit_all <- lm(TARGET_WINS ~ . , df_new)
-summary(fit_all)
+trainingDataRaw = trainingdata_bk
+data_no_index = trainingDataRaw[,2:17] # delete index
 ```
 
 ####Model --(Nathan)
@@ -214,7 +208,7 @@ I then created a linear regression, and created additional, improved regression 
 
 ```{r}
 #dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
-dfraw = trainingdata
+dfraw = trainingdata_bk
 dfremove <- subset(dfraw, INDEX == 1347 | TEAM_BATTING_BB == 0 | 
                      TEAM_BATTING_3B < 11 | TEAM_BATTING_3B > 153 | # http://www.baseball-almanac.com/rb_trip2.shtml
                      TEAM_BATTING_HR < 3 | TEAM_BATTING_HR > 264 |#http://www.baseball-almanac.com/recbooks/rb_hr7.shtml
@@ -296,5 +290,28 @@ predictionsStepReduced <- predict(stepReduced, trainingDataRaw[,c(2:10, 12:17)])
 rmseStepR <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepReduced)] - predictionsStepReduced[!is.na(predictionsStepReduced)])^2))
 rmseStepR
 ```
+
+
+## Aadi Models
+
+```{r}
+modeldata_positive = trainingdata_bk[, c(2, 3:7, 9, 15, 17)]  #HBP not included
+model3 = lm(TARGET_WINS ~., data = modeldata_positive)
+summary(model3)
+
+modeldata_negative = trainingdata_bk[, c(2, 8, 10, 12:14, 16)]
+model4 = lm(TARGET_WINS ~., data = modeldata_negative)
+summary(model4)
+
+modeldata_batting = trainingdata_bk[, c(2, 3:7, 8)] #HBP not included
+model5 = lm(TARGET_WINS ~., data = modeldata_batting)
+summary(model5)
+
+modeldata_notbatting = trainingdata_bk[, c(2, 9:10, 12:17)]
+model6 = lm(TARGET_WINS ~., data = modeldata_notbatting)
+summary(model6)
+
+```
+
 
 #Model Selection and Prediction
