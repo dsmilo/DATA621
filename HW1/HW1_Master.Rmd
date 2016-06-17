@@ -295,18 +295,22 @@ rmseStepR
 ## Aadi Models
 
 ```{r}
+#all variables that have positive impact
 modeldata_positive = trainingdata_bk[, c(2, 3:7, 9, 15, 17)]  #HBP not included
 model3 = lm(TARGET_WINS ~., data = modeldata_positive)
 summary(model3)
 
+#all variables that have negative impact
 modeldata_negative = trainingdata_bk[, c(2, 8, 10, 12:14, 16)]
 model4 = lm(TARGET_WINS ~., data = modeldata_negative)
 summary(model4)
 
+#all batting variables
 modeldata_batting = trainingdata_bk[, c(2, 3:7, 8)] #HBP not included
 model5 = lm(TARGET_WINS ~., data = modeldata_batting)
 summary(model5)
 
+#all non batting variables
 modeldata_notbatting = trainingdata_bk[, c(2, 9:10, 12:17)]
 model6 = lm(TARGET_WINS ~., data = modeldata_notbatting)
 summary(model6)
