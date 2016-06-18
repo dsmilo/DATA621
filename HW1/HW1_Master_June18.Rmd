@@ -150,49 +150,16 @@ plot(fitted(model2), residuals(model2))
 abline(h=0, col='red')
 
 ```
+#####Model Summary Table
 
-
-
-
+|Model #|# of Predictors|Adj. R^2|P-Value|Residual Standard Error|Degrees of Freedom
+|---|---|---|---|---|---|
+|1|11|0.31|2.2e-16|13.07|2264
 
 
 #####Model 1: Simple Full Linear Regression, With Removal of Non-Significant Predictors
 
-This is a model where all predictors are used, and the data is not processed at all, except to replace NA values with the medians of the respective column; predictors are sequentially removed until all have p values below a 0.05 threshold.
 
-The predictors with high numbers of NA values - TEAM_BATTING_HBP (2085 NA values) and TEAM_BASERUN_CS (772 NAs) have no significance - likely because their values are so uniform, giving them little ability to explain the response.
-
-Summary of Model:
-Call:
-lm(formula = TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + 
-    TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
-    TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_SO + TEAM_FIELDING_E + 
-    TEAM_FIELDING_DP, data = df_new)
-
-Residuals:
-    Min      1Q  Median      3Q     Max 
--49.598  -8.593   0.085   8.445  58.582 
-
-Coefficients:
-                   Estimate Std. Error t value Pr(>|t|)    
-(Intercept)      22.3440443  5.2338369   4.269 2.04e-05 ***
-TEAM_BATTING_H    0.0490922  0.0036699  13.377  < 2e-16 ***
-TEAM_BATTING_2B  -0.0213744  0.0091626  -2.333 0.019746 *  
-TEAM_BATTING_3B   0.0665763  0.0166230   4.005 6.40e-05 ***
-TEAM_BATTING_HR   0.0674046  0.0096315   6.998 3.40e-12 ***
-TEAM_BATTING_BB   0.0115464  0.0033748   3.421 0.000634 ***
-TEAM_BATTING_SO  -0.0085211  0.0024529  -3.474 0.000523 ***
-TEAM_BASERUN_SB   0.0249207  0.0042092   5.920 3.70e-09 ***
-TEAM_PITCHING_H  -0.0007770  0.0003209  -2.421 0.015552 *  
-TEAM_PITCHING_SO  0.0029662  0.0006719   4.415 1.06e-05 ***
-TEAM_FIELDING_E  -0.0190100  0.0023919  -7.948 2.97e-15 ***
-TEAM_FIELDING_DP -0.1217894  0.0129296  -9.419  < 2e-16 ***
----
-Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-Residual standard error: 13.07 on 2264 degrees of freedom
-Multiple R-squared:  0.3151,	Adjusted R-squared:  0.3117 
-F-statistic: 94.68 on 11 and 2264 DF,  p-value: < 2.2e-16
 
 ```{r}
 dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
