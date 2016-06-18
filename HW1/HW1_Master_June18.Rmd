@@ -233,15 +233,18 @@ dfremove <- subset(dfraw, INDEX == 1347)$INDEX
 df <- subset(dfraw, !(INDEX %in% dfremove))
 df <- df[, -c(1,10,11,17)] #Remove caught stealing and hit by pitcher variables and fielding double play, due to too many NAs (CS and HBP) and lack of relevance (DP)
 
-df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < 13 | df$TEAM_BASERUN_SB > 638, NA, df$TEAM_BASERUN_SB) #http://www.baseball-almanac.com/recbooks/rb_stba2.shtml
+df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < 13 | df$TEAM_BASERUN_SB > 638, NA, df$TEAM_BASERUN_SB) 
+#http://www.baseball-almanac.com/recbooks/rb_stba2.shtml
 df$TEAM_BATTING_3B <- ifelse(df$TEAM_BATTING_3B < 11 | df$TEAM_BATTING_3B > 153, NA, df$TEAM_BATTING_3B)
-# http://www.baseball-almanac.com/rb_trip2.shtml
+#http://www.baseball-almanac.com/rb_trip2.shtml
 df$TEAM_BATTING_HR <- ifelse(df$TEAM_BATTING_HR < 3 | df$TEAM_BATTING_HR > 264, NA, df$TEAM_BATTING_HR)
 #http://www.baseball-almanac.com/recbooks/rb_hr7.shtml
 df$TEAM_BATTING_SO <- ifelse(df$TEAM_BATTING_SO < 308 | df$TEAM_BATTING_SO > 1535, NA, df$TEAM_BATTING_SO)
 #http://www.baseball-almanac.com/recbooks/rb_strike2.shtml
-df$TEAM_PITCHING_SO <- ifelse(df$TEAM_PITCHING_SO < 333 | df$TEAM_PITCHING_SO > 1450, NA, df$TEAM_PITCHING_SO) #http://www.baseball-almanac.com/recbooks/rb_strik.shtml
-df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < 13 | df$TEAM_BASERUN_SB > 638, NA, df$TEAM_BASERUN_SB) #http://www.baseball-almanac.com/recbooks/rb_stba2.shtml
+df$TEAM_PITCHING_SO <- ifelse(df$TEAM_PITCHING_SO < 333 | df$TEAM_PITCHING_SO > 1450, NA, df$TEAM_PITCHING_SO) 
+#http://www.baseball-almanac.com/recbooks/rb_strik.shtml
+df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < 13 | df$TEAM_BASERUN_SB > 638, NA, df$TEAM_BASERUN_SB) 
+#http://www.baseball-almanac.com/recbooks/rb_stba2.shtml
 
 fit <- lm(TARGET_WINS~.,df)
 summary(fit)
