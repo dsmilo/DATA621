@@ -156,6 +156,7 @@ abline(h=0, col='red')
 |---|---|---|---|---|---|---|
 |1|11|0.31|95|2.2e-16|13.07|2264
 |2|8|0.22|82|2.2e-16|13.82|2266
+|3|7|0.35|157|2.2e-16|11.07|1993
 
 
 #####Model 1: Simple Full Linear Regression, With Removal of Non-Significant Predictors
@@ -222,6 +223,59 @@ fit <- update(fit, .~.-TEAM_PITCHING_H)
 summary(fit)
 fit <- update(fit, .~.-TEAM_BATTING_HR)
 summary(fit)
+```
+
+```{r}
+#Model 3 using 1880- Data
+install.packages("leaps")
+dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+dfremove <- subset(dfraw, INDEX == 1347)$INDEX 
+df <- subset(dfraw, !(INDEX %in% dfremove))
+df <- df[, -c(1,10,11,17)] #Remove caught stealing and hit by pitcher variables and fielding double play, due to too many NAs (CS and HBP) and lack of relevance (DP)
+
+df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < 13 | df$TEAM_BASERUN_SB > 638, NA, df$TEAM_BASERUN_SB) #http://www.baseball-almanac.com/recbooks/rb_stba2.shtml
+df$TEAM_BATTING_3B <- ifelse(df$TEAM_BATTING_3B < 11 | df$TEAM_BATTING_3B > 153, NA, df$TEAM_BATTING_3B)
+# http://www.baseball-almanac.com/rb_trip2.shtml
+df$TEAM_BATTING_HR <- ifelse(df$TEAM_BATTING_HR < 3 | df$TEAM_BATTING_HR > 264, NA, df$TEAM_BATTING_HR)
+#http://www.baseball-almanac.com/recbooks/rb_hr7.shtml
+df$TEAM_BATTING_SO <- ifelse(df$TEAM_BATTING_SO < 308 | df$TEAM_BATTING_SO > 1535, NA, df$TEAM_BATTING_SO)
+#http://www.baseball-almanac.com/recbooks/rb_strike2.shtml
+df$TEAM_PITCHING_SO <- ifelse(df$TEAM_PITCHING_SO < 333 | df$TEAM_PITCHING_SO > 1450, NA, df$TEAM_PITCHING_SO) #http://www.baseball-almanac.com/recbooks/rb_strik.shtml
+df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < 13 | df$TEAM_BASERUN_SB > 638, NA, df$TEAM_BASERUN_SB) #http://www.baseball-almanac.com/recbooks/rb_stba2.shtml
+
+fit <- lm(TARGET_WINS~.,df)
+summary(fit)
+fit1 <- update(fit, .~.-TEAM_BATTING_H)
+summary(fit1)
+
+fit2 <- update(fit1, .~.-TEAM_PITCHING_HR)
+summary(fit2)
+fit3 <- update(fit2, .~.-TEAM_PITCHING_SO)
+summary(fit3)
+
+
+fit4 <- update(fit3, .~.-TEAM_BATTING_2B) 
+summary(fit4)
+fit5 <- update(fit4, .~.-TEAM_PITCHING_BB)
+summary(fit5)
+fit6 <- update(fit5, .~.-TEAM_PITCHING_H) 
+summary(fit6)
+
+df$TEAM_BATTING_1B <- df$TEAM_BATTING_H - df$TEAM_BATTING_2B - df$TEAM_BATTING_3B - df$TEAM_BATTING_HR #Singles - 1st Base Hits
+fit7 <- update(fit6,.~.+TEAM_BATTING_1B)
+summary(fit7)
+
+pairs(~TARGET_WINS + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB +TEAM_FIELDING_E, df, upper.panel = panel.smooth, lower.panel = NULL)
+
+
+#These are variables that I tried but didn't turn out to be valuable
+
+df$TEAM_BATTING_HRP <- df$TEAM_BATTING_HR/df$TEAM_BATTING_H #Home runs as a percentage of base hits
+summary(update(fit6,.~.+TEAM_BATTING_HRP))
+
+df$TEAM_BATTING_HSO <- df$TEAM_BATTING_H/df$TEAM_BATTING_SO #Ratio of hits to strikeouts
+summary(update(fit6,.~.+TEAM_BATTING_HSO))
+
 ```
 
 ```{r}
