@@ -152,9 +152,9 @@ abline(h=0, col='red')
 ```
 #####Model Summary Table
 
-|Model #|# of Predictors|Adj. R^2|P-Value|Residual Standard Error|Degrees of Freedom
+|Model #|# of Predictors|Adj. R^2|F-Statistic|P-Value|Residual Standard Error|Degrees of Freedom|
 |---|---|---|---|---|---|
-|1|11|0.31|2.2e-16|13.07|2264
+|1|11|0.31|95|2.2e-16|13.07|2264
 
 
 #####Model 1: Simple Full Linear Regression, With Removal of Non-Significant Predictors
