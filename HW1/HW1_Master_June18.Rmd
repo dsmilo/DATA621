@@ -155,10 +155,11 @@ abline(h=0, col='red')
 |Model #|# of Predictors|Adj. R^2|F-Statistic|P-Value|Residual Standard Error|Degrees of Freedom|
 |---|---|---|---|---|---|---|
 |1|11|0.31|95|2.2e-16|13.07|2264
+|2|8|0.22|82|2.2e-16|13.82|2266
 
 
 #####Model 1: Simple Full Linear Regression, With Removal of Non-Significant Predictors
-
+Description: Replace all NA values in original dataset; fit linear regression to all predictors; sequentially remove all non-significant predictors (p<.05)
 
 
 ```{r}
