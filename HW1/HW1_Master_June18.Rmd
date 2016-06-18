@@ -165,7 +165,6 @@ abline(h=0, col='red')
 dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
 data_no_index <- dfraw[ ,c(2:17)] #Remove INDEX column
 for (i in 1:16) {
-  #ifelse(is.na(data_no_index[,i]), median(data_no_index[,i], na.rm = TRUE), data_no_index[,i])
   data_no_index[,i][is.na(data_no_index[,i])] <-  median(data_no_index[,i], na.rm = TRUE)
 }
 df_new <- data_no_index
@@ -183,6 +182,9 @@ summary(fit)
 fit <- update(fit, .~.-TEAM_PITCHING_HR)
 summary(fit)
 ```
+
+#####Model 2: SLR Bounded by Recent MLB Data (1962-)
+
 
 
 ```{r}
