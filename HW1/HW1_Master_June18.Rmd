@@ -224,7 +224,11 @@ summary(fit)
 fit <- update(fit, .~.-TEAM_BATTING_HR)
 summary(fit)
 ```
-
+#####Model 3: Data Bounded by 1880-2015 Records
+Predictors removed, due to high NA count: TEAM_BATTING_HBP and TEAM_BASERUN_CS
+Predictor removed, due to lack of relevance: TEAM_FIELDING_DP
+Bounds for predictors set by MLB records, with URL references.
+Predictors removed sequentially removed; one predictor added - number of 1st base hits.
 ```{r}
 #Model 3 using 1880- Data
 install.packages("leaps")
