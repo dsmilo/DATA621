@@ -156,7 +156,27 @@ abline(h=0, col='red')
 
 
 
-#####Model 1
+#####Model 1: Simple Full Linear Regression, With Removal of Non-Significant Predictors
+
+This is a model where all predictors are used, and the data is not processed at all; predictors are sequentially removed until all have p values below a 0.05 threshold.
+```{r}
+dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+fit <- lm(TARGET_WINS~.-INDEX, dfraw)
+summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_SO)
+summary(fit)
+fit <- update(fit, .~.-TEAM_PITCHING_BB)
+summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_2B)
+summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_HR)
+summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_SO)
+summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_SO)
+summary(fit)
+```
+
 
 ```{r}
 #dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
