@@ -185,7 +185,43 @@ summary(fit)
 
 #####Model 2: SLR Bounded by Recent MLB Data (1962-)
 
+```{r}
+dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+dfremove <- subset(dfraw, INDEX == 1347)$INDEX 
+df <- subset(dfraw, !(INDEX %in% dfremove))
+data_no_index <- df[ ,c(2:17)] #Remove INDEX column
+for (i in 1:16) {
+  data_no_index[,i][is.na(data_no_index[,i])] <-  median(data_no_index[,i], na.rm = TRUE)
+}
+df <- data_no_index
+MLB <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/MLB.Stats.1962-2015.csv"))
 
+df$TEAM_BATTING_BB <- ifelse(df$TEAM_BATTING_BB < min(MLB$BB) | df$TEAM_BATTING_BB > max(MLB$BB), median(df$TEAM_BATTING_BB), df$TEAM_BATTING_BB)
+df$TEAM_BATTING_H <- ifelse(df$TEAM_BATTING_H < min(MLB$H) | df$TEAM_BATTING_H > max(MLB$H), median(df$TEAM_BATTING_H), df$TEAM_BATTING_H)
+df$TEAM_BATTING_2B <- ifelse(df$TEAM_BATTING_2B < min(MLB$X2B) | df$TEAM_BATTING_2B > max(MLB$X2B), median(df$TEAM_BATTING_2B), df$TEAM_BATTING_2B)
+df$TEAM_BATTING_3B <- ifelse(df$TEAM_BATTING_3B < min(MLB$X3B) | df$TEAM_BATTING_3B > max(MLB$X3B), median(df$TEAM_BATTING_3B), df$TEAM_BATTING_3B)
+df$TEAM_BATTING_HR <- ifelse(df$TEAM_BATTING_HR < min(MLB$HR) | df$TEAM_BATTING_HR > max(MLB$HR), median(df$TEAM_BATTING_HR), df$TEAM_BATTING_HR)
+df$TEAM_BATTING_SO <- ifelse(df$TEAM_BATTING_SO < min(MLB$SO) | df$TEAM_BATTING_SO > max(MLB$SO), median(df$TEAM_BATTING_SO), df$TEAM_BATTING_SO)
+df$TEAM_PITCHING_SO <- ifelse(df$TEAM_PITCHING_SO < min(MLB$SO.1) | df$TEAM_PITCHING_SO > max(MLB$SO.1), median(df$TEAM_PITCHING_SO), df$TEAM_PITCHING_SO)
+df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < min(MLB$SB) | df$TEAM_BASERUN_SB > max(MLB$SB), median(df$TEAM_BASERUN_SB), df$TEAM_BASERUN_SB)
+
+fit <- lm(TARGET_WINS~.,df)
+summary(fit)
+fit <- update(fit, .~.-TEAM_PITCHING_SO)
+summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_3B)
+summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_HBP)
+summary(fit)
+fit <- update(fit, .~.-TEAM_PITCHING_BB)
+summary(fit)
+fit <- update(fit, .~.-TEAM_BASERUN_CS)
+summary(fit)
+fit <- update(fit, .~.-TEAM_PITCHING_H)
+summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_HR)
+summary(fit)
+```
 
 ```{r}
 #dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
