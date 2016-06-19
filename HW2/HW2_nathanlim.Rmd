@@ -10,19 +10,20 @@ output: html_document
 df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW2/Data/classification-output-data.csv"))
 head(df)
 (confusion <- table(select(df, class, scored.class)))
+predicted="scored.class"
 ```
 
 3. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
 and returns the accuracy of the predictions.
 
 ```{r}
-accuracy_function <- function(df){
+accuracy_function <- function(df, scored.class){
   confusion <- table(select(df, class, scored.class))
   accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
   return(accuracy)
 }
 
-accuracy_function(df)
+accuracy_function(df,scored.class)
 ```
 
 4. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
@@ -30,18 +31,18 @@ and returns the classification error rate of the predictions.
 
 
 ```{r}
-CER_function<- function(df){
-  confusion <- table(select(df, class, scored.class))
+CER_function<- function(df, predicted){
+  confusion <- table(select(df, class, get(predicted)))
   classification_error_rate <- (confusion[1,2] + confusion[2,1])/sum(confusion)
   return(classification_error_rate)
 }
 
-CER_function(df)
+CER_function(df,predicted)
 ```
 
 Verify by summing the rates
 ```{r}
-accuracy_function(df) +  CER_function(df)
+accuracy_function(df,predicted) +  CER_function(df,predicted)
 ```
 
 
@@ -49,15 +50,151 @@ accuracy_function(df) +  CER_function(df)
 
 
 ```{r}
-precision_function <- function(df){
-  confusion <- table(select(df, class, scored.class))
+precision_function <- function(df, predicted){
+  confusion <- table(select(df, class, get(predicted)))
   precision <- confusion[2,2]/(confusion[1,2] + confusion[2,2])
   return(precision)
 }
 
-precision_function(df)
+precision_function(df,predicted)
 ```
 
 
 6. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
 and returns the sensitivity of the predictions. Sensitivity is also known as recall.
+
+
+
+```{r}
+
+sensitivity_function <- function(df, predicted){
+  confusion <- table(select(df, class, get(predicted)))
+  if(dim(confusion)[2] == 1){
+    if(colnames(confusion) == 0){
+      sensitivity <- 0
+    } else{
+      sensitivity <- 1
+    }
+  } else{
+      sensitivity <- confusion[2,2]/(confusion[2,1] + confusion[2,2])
+  }
+
+  return(sensitivity)
+}
+
+sensitivity_function (df, predicted)
+```
+
+
+7. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
+and returns the specificity of the predictions.
+
+```{r}
+specificity_function <- function(df,predicted){
+  confusion <- table(select(df, class, get(predicted)))  
+  if(dim(confusion)[2] == 1){
+    if(colnames(confusion) == 0){
+      specificity <- 1
+    } else{
+      specificity <- 0
+    }
+  } else{
+    specificity <- confusion[1,1]/(confusion[1,1] + confusion[1,2])
+  }
+  return(specificity)
+}
+
+specificity_function(df, predicted)
+```
+
+8. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
+and returns the F1 score of the predictions.
+
+```{r}
+f1score_function <- function(df, predicted){
+  precision <- precision_function(df, predicted)
+  sensitivity <- sensitivity_function(df, predicted)
+  f1score <- (2 * precision * sensitivity)/(precision + sensitivity)
+  return(f1score)
+}
+
+f1score_function(df, predicted)
+```
+
+
+9. Before we move on, letâ€™s consider a question that was asked: What are the bounds on the F1 score? Show
+that the F1 score will always be between 0 and 1. (Hint: If 0 < ð‘Ž < 1 and 0 < ð‘ < 1 then ð‘Žð‘ < í µ
+í±Ž.)
+
+
+
+
+
+
+
+10. Write a function that generates an ROC curve from a data set with a true classification column (class in our
+example) and a probability column (scored.probability in our example). Your function should return a list
+that includes the plot of the ROC curve and a vector that contains the calculated area under the curve
+(AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals.
+
+
+```{r}
+roc_function <- function(df){
+
+  sensitivity_list <- c()
+  specificity_list <- c()
+  
+  for (i in seq(0,1, 0.01)) {
+
+    df$new.scored <- ifelse(df$scored.probability < i, 0, 1)
+
+    sensitivity_list[i*100+1] <- sensitivity_function(df, "new.scored")
+
+    specificity_list[i*100+1] <- specificity_function(df, "new.scored")
+
+  }
+  
+  roc_df = data.frame(threshold=seq(0,1, 0.01), sensitivity= sensitivity_list, specificity=specificity_list)
+
+  return(roc_df)
+
+}
+
+
+roc.results <- roc_function(df)
+
+head(roc.results)
+
+ggplot(roc.results, aes(x=1-specificity, y=sensitivity)) + geom_line() + ggtitle("ROC Curve")
+
+```
+
+11. Use your created R functions and the provided classification output data set to produce all of the
+classification metrics discussed above.
+
+
+
+12. Investigate the caret package. In particular, consider the functions confusionMatrix, sensitivity, and
+specificity. Apply the functions to the data set. How do the results compare with your own functions?
+
+```{r}
+library(caret)
+confusionMatrix(df$scored.class, df$class, positive = "1")
+
+sensitivity_function(df)
+specificity_function(df)
+
+```
+They match well
+
+
+13. Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results
+
+```{r}
+library(pROC)
+
+roc_curve <- roc(factor(class) ~ scored.probability, data=df)
+
+plot(roc_curve, col="red", main="ROC curve")
+
+```
