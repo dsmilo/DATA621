@@ -74,4 +74,12 @@ ROCf <- function(df) {
 
 ROCf(raw)
 #ROCdf <- ROCf(raw)
+
+accuracy(raw)
+erroneousness(raw)
+precision(raw)
+sensitivity(raw)
+specificity(raw)
+F1(raw)
+
 ```
