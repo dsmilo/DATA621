@@ -161,7 +161,7 @@ abline(h=0, col='red')
 
 
 #####Model 1: Simple Full Linear Regression, With Removal of Non-Significant Predictors
-Description: Replace all NA values in original dataset; fit linear regression to all predictors; sequentially remove all non-significant predictors (p<.05)
+Description: Missing values were replaced with the median values from the associated predictor, to retain all data points for making a regression; a linear regression was fit to all predictors; All non-significant predictors (p<.05) were removed sequentially.
 
 
 ```{r}
@@ -187,6 +187,11 @@ summary(fit)
 ```
 
 #####Model 2: SLR Bounded by Recent MLB Data (1962-)
+
+Description: Missing values were replaced with the median values from the associated predictor. Data was compared against records from 1962 and onwards, aka the MLB dataset, and data outside the bounds of that external dataset were replaced with the medians of the associated predictor. Eg, if one of the records in our dataset had more home runs hit than in all of the MLB dataset, then that home run data point was replaced with the median home run figure in our dataset.
+
+Then, a linear regression was fitted to all predictors; predictors were removed in order of significance, to obtain a model with a higher f-statistic.
+
 
 ```{r}
 dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
@@ -226,10 +231,12 @@ fit <- update(fit, .~.-TEAM_BATTING_HR)
 summary(fit)
 ```
 #####Model 3: Data Bounded by 1880-2015 Records
+Three predictors were removed:
 Predictors removed, due to high NA count: TEAM_BATTING_HBP and TEAM_BASERUN_CS
 Predictor removed, due to lack of relevance: TEAM_FIELDING_DP
-Bounds for predictors set by MLB records, with URL references.
-Predictors removed sequentially removed; one predictor added - number of 1st base hits.
+
+Bounds for predictors were set by MLB records from 1880 to today, with URL references shown in the code. Where our records were outside the bounds of these external records, they were replaced with NA values.
+Predictors removed sequentially removed, in order of significance; multiple predictors were created and tested, in the hopes of improving fit statistics, and one proved useful - the number of 1st base hits. This predictor was then added to the model.
 ```{r}
 #Model 3 using 1880- Data
 install.packages("leaps")
