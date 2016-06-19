@@ -11,9 +11,11 @@ geometry: margin=0.5in
 ---
 
 ```{r, echo = FALSE}
+library(knitr)
+opts_chunk$set(warning=FALSE, message=FALSE, comment=NA, fig.align='center')
+
 library(stringr)
 library(pander)
-library(knitr)
 library(ggplot2)
 library(gridExtra)
 library(reshape2)
@@ -131,8 +133,22 @@ In summary, the baseball data set provided includes many variables with a skewed
 
 #Data Preparation
 
-It was determined that the _Hits By Pitch_ variable had too many missing values to be useful for regression, and thus this variable was excluded from the model building process. As shown in Table 1 above, there are several variables that have missing values. The attempted solution to this problem involved imputation using the median for each variable in the data set. A summary of the data is shown here again for inspection and confirmation of similarity between the old and new data sets:
+The dataset contains 17 columns - an index column (INDEX), a response column (TARGET_WINS) and 15 predictor columns. There are 2,276 observations - but there are many missing values for many of the predictors. 
 
+Two predictors in particular stand out:
+```{r, echo = FALSE}
+a = c("TEAM_BATTING_HBP", "Batters hit by pitch (free base)", "Positive", "91.6%", "0.07", "0.31")
+b = c("TEAM_BASERUN_CS", "Strikeouts by batters", "Negative", "33.9%", "0.02", "0.39")
+
+names(a) = c("Predictor Name", "Description", "Impact", "% Missing", "r with Response", "p-Value")
+names(b) = names(a)
+c = as.data.frame(rbind(a, b))
+kable(c)
+```
+
+Including these predictors in our dataset would mean that we would either have to forego a significant portion of our data (34% or 92%), or impute a large number of data points. Their correlation coefficients with the response are less than an absolute value of 0.07; the p values of a simple one variable linear regression using them and the response yields models of no statistical significance (i.e. p > 0.05). Thus, it seems safe to exclude these predictors from our models. In this way, we avoid the twin pitfalls of mass exclusion and imputation.
+
+It was determined that the _Hits By Pitch_ variable had too many missing values to be useful for regression, and thus this variable was excluded from the model building process. As shown in Table 1 above, there are several variables that have missing values. The attempted solution to this problem involved imputation using the median for each variable in the data set. A summary of the data is shown here again for inspection and confirmation of similarity between the old and new data sets:
 
 #####Missing Values Imputed With Median
 ```{r, echo = FALSE}
@@ -150,20 +166,6 @@ kable(imp_data)
 trainingdata = df_new
 ```
 
-The dataset contains 17 columns - an index column (INDEX), a response column (TARGET_WINS) and 15 predictor columns. There are 2,276 observations - but there are many missing values for many of the predictors. 
-
-Two predictors in particular stand out:
-```{r, echo = FALSE}
-a = c("TEAM_BATTING_HBP", "Batters hit by pitch (free base)", "Positive", "91.6%", "0.07", "0.31")
-b = c("TEAM_BASERUN_CS", "Strikeouts by batters", "Negative", "33.9%", "0.02", "0.39")
-
-names(a) = c("Predictor Name", "Description", "Impact", "% Missing", "r with Response", "p-Value")
-names(b) = names(a)
-c = as.data.frame(rbind(a, b))
-kable(c)
-```
-
-Including these predictors in our dataset would mean that we would either have to a) forgo a significant chunk of our data (34% or 92%) or b) impute a large number of data points.  Their correlation coefficients with the response are less than an absolute value of 7%; the p values of a simple one variable linear regression using them and the response yields models of no statistical significance (i.e. p > 0.05). Thus, it seems safe to exclude these predictors from our models. This way, we avoid the twin pitfalls of mass exclusion and imputation.
 
 Further exclusions to the data were made:
 
@@ -174,7 +176,13 @@ TEAM_BATTING_BB == 0 | Anomalously low walk count (expected occurences of a zero
 TEAM_BATTING_SO | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_strike2.shtml)
 TEAM_BATTING_HR | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_hr7.shtml)
 
-It should be noted that the records excluded from the first two rows of the table above are the same exact points (which would technically make the second exclusion redundant...). That suggests that for whatever reason, strikeouts were not recorded for those rows, but were marked as zero. Those two predictors have the same number of NA values, 102, suggesting their recording method was linked somehow.
+It should be noted that the records excluded from the first two rows of the table above are similar. This suggests that strikeouts were not recorded for those rows, but were marked as zero. Those two predictors have the same number of NA values, 102, suggesting their recording method could have been linked.
+
+Many of the more advanced baseball statistics are simply combinations of other statistics (i.e. slugging percentage is total bases divided by at-bats). Using the predictors given in the data set, we wanted to see if combining predictors and/or calculating new values would increase any significance in a model that is trying to predict wins. Total bases and extra bases are both stats that can easily be calculated with the given data. Assuming that the number of doubles, triples and home runs are included in the `TEAM_BATTING_H` variable, we can subtract these out to obtain the number of singles. Adding this to the doubles, triples, and homeruns, each multiplied by the number of bases each is worth (2,3, and 4 respectively) would give total bases. Doing the same thing, but excluding single base hits would give the number of extra bases as well. These two statistics were used in the model, along with many of the other predictors.
+
+Since the fielding errors predictor was drastically right-skewed (see Appendix A), a log transformation was done on this predictor, resulting in a better fit of the model. 
+
+
 
 #Model Creation
 #####Model Summary Table
@@ -369,8 +377,8 @@ pander(summary(model4))
 ```
 
 ####Model 5: Feature engineering and new variables
+Using a step-wise methodology, less significant predictors such as caught stealing, pitching walks & hits were left out. To avoid including predictors that were related, the base hits/singles and other multiple base hit predictors were left out. Most of the predictors have coefficients that behave the way we would expect, given the predictors effect on the game. The extra bases predictor ended up having a negative coefficient, when we would expect there to be a positive one. This may be due to the fact that it is similar stats that make up these predictors, and there is collinearity between the total bases and extra bases predictors. Removing extra bases from the model results in a lower coefficient for total bases, and an overall lower adjusted $R^2$ value for the model.
 
-Many of the more advanced baseball statistics are simply combinations of other statistics (i.e. slugging percentage is total bases divided by at-bats). Using the predictors given in the data set, we wanted to see if combining predictors and/or calculating new values would increase any significance in a model that is trying to predict wins. Total bases and extra bases are both stats that can easily be calculated with the given data. Assuming that the number of doubles, triples and home runs are included in the `TEAM_BATTING_H` variable, we can subtract these out to obtain the number of singles. Adding this to the doubles, triples, and homeruns, each multiplied by the number of bases each is worth (2,3, and 4 respectively) would give total bases. Doing the same thing, but excluding single base hits would give the number of extra bases as well. These two statistics were used in the model, along with many of the other predictors. Using a step-wise methodology, less significant predictors such as caught stealing, pitching walks & hits were left out. To avoid including predictors that were related, the base hits/singles and other multiple base hit predictors were left out. Since the fielding errors predictor was drastically right-skewed, a log transformation was done on this predictor, resulting in a better fit of the model. Most of the predictors have coefficients that behave the way we would expect, given the predictors effect on the game. The extra bases predictor ended up having a negative coefficient, when we would expect there to be a positive one. This may be due to the fact that it is similar stats that make up these predictors, and there is collinearity between the total bases and extra bases predictors. Removing extra bases from the model results in a lower coefficient for total bases, and an overall lower adjusted $R^2$ value for the model.
 
 ```{r, echo = FALSE, fig.height=1}
 
@@ -395,32 +403,30 @@ pander(summary(lt_model3))
 
 
 #Model Selection and Prediction
-The reduced step-wise model described above is selected as the best model for prediction of team wins in a 162-game baseball season.  While the $R^2$ value of this model is not the highest of the models tested, its high F-score indicates that it is the most statistically significant.  Additionally, it is one of the more parsimonious models tested, and the simplicity of the model lends itself to easier understanding of the model by possible implementers of the model.
-```{r, echo = FALSE}
-stepReduced = model4
-```
+The model utilizing only the significant predictors (Model 4) is selected as the best model for prediction of team wins in a 162-game baseball season.  While the R^2 value of this model the second-lowest of the five models tested, its high F-score indicates that it is the most statistically significant.  Additionally, it is the most parsimonious models tested, and the simplicity lends itself to easier understanding of the model by other users.
 
-
-This model has a root-mean-square error of `r round(summary(stepReduced)$sigma, 4)`, an $R^2$ of `r round(summary(stepReduced)$r.squared, 2)`, and an F-statistic of `r round(summary(stepReduced)$fstatistic[1], 1)`. The F statistic has a corresponding p-value of <2.2e-16.
+This model has a root-mean-square error of `r round(summary(model4)$sigma, 4)`, an R^2 of `r round(summary(model4)$r.squared, 2)`, and an F-statistic of `r round(summary(model4)$fstatistic[1], 1)`. The F statistic has a corresponding p-value of <2.2e-16.
 
 The residual plots for this model are presented below:
 
 ```{r fit-residuals, echo=FALSE, fig.height=7/3}
 par(mfrow = c(1, 3))
-plot(stepReduced$residuals, main = NULL)
-hist(stepReduced$residuals, main = NULL)
-qqnorm(stepReduced$residuals, main = NULL)
-qqline(stepReduced$residuals)
+plot(model4$residuals, main = NULL)
+abline(h = 0, lty = 2)
+hist(model4$residuals, main = NULL)
+qqnorm(model4$residuals, main = NULL)
+qqline(model4$residuals)
 par(mfrow = c(1, 1))
+stepReduced = model4
 ```
 
-There does not appear to be any pattern in the residuals in the scatterplot, so the condition of linearity can be accepted.  The histogram indicates that the residuals are normally distributed.  Finally, the scatterplot and Q-Q plot indicate that the residuals indicate near-constant variability.  Because the conditions are met, the validity of the use of a linear model is accepted.
+There does not appear to be any pattern in the residuals in the scatterplot, so the condition of linearity can be accepted.  The histogram and Q-Q plot indicate that the residuals are roughly normally distributed, albeit with short tails.  Finally, the scatterplot and Q-Q plot indicate that the residuals indicate near-constant variability.  Because the conditions are met, the validity of the use of a linear model is accepted.
 
 The linear model is applied to an evaluation dataset containing response variables for 259 cases.  A histogram of the predicted team wins is presented below.
 
 ```{r evaluation, echo=FALSE}
 evaluation_data <- read.csv('https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-evaluation-data.csv')
-par(mfrow = c(1, 1), pin = c(2, 2))
+par(mfrow = c(1, 2), pin = c(2, 2))
 
 predicted_wins <- predict(stepReduced, evaluation_data)
 hist(predicted_wins)
@@ -428,17 +434,37 @@ training_wins = trainingdata_bk$TARGET_WINS
 hist(training_wins, breaks = 8)
 ```
 
-The predicted wins appear roughly normally distributed, with a slight right-skewness and is compared here to the `TARGET_WINS` variable in the training data set. As expected, the distribution is centered near 82, which represents a 0.500 season. Further investigation shows that the median is indeed roughly 82 wins, with the mean slightly lower at roughly 81 wins. Full documentation of wins listed by index in the evaluation data set can be found in Appendix B. 
+The predicted wins appear roughly normally distributed, with a slight right-skewness.  As expected, the distribution is centered near 82, which represents a 0.500 season.  Further investigation shows that the median is indeed roughly 82 wins, with the mean slightly lower at roughly 81 wins.
+
+Due to missing values, however, there are 89 missing predictions, representing roughly 34% of the total dataset.  In order to allow for predictions of the full 259 cases in the evaluation dataset, missing values are filled with the median for each given missing variable.  The linear model is again applied, this time to the evaluation dataset with imputed median values.  A histogram of this modified predicted team wins is presented below.
+
+```{r impute-evaluation, echo=FALSE}
+evaluation_data_imputed <- evaluation_data
+for (i in 2:ncol(evaluation_data_imputed)){
+  evaluation_data_imputed[, i][is.na(evaluation_data_imputed[, i])] <- median(evaluation_data_imputed[, i], na.rm = TRUE)
+}
+
+par(mfrow = c(1, 1), pin = c(3,2))
+predicted_wins_imputed <- predict(model4, evaluation_data_imputed)
+hist(predicted_wins_imputed)
+```
+
+In contrast to the predictions for the raw evaluation dataset, this set of predictions is left-skewed.  The median and mean for this set of predictions are both roughly 81.  The shape of the distribution, which is seemingly condensed towards the median, suggests that imputation using the median may have introduced a bias towards the center of the distribution (which, again, corresponds to a 0.500 season with 82 wins). Although it is outside the scope of this investigation, more advanced imputation that will avoid the introduction of bias may be advisable for cases with missing predictors.
+
+A comparison of the full sets of predictions for the evaluation dataset is available in Appendix B.
+
+\newpage 
 
 #Appendix A -- Correlations with TARGET_WINS
 ```{r, echo = FALSE}
-par(pin = c(3, 1))
+par(mfrow = c(1,2), pin = c(3, 1))
 for (var_count in 3:17) {
   #plot(x = trainingdata_bk[, var_count], y = trainingdata$TARGET_WINS, xlab = names(trainingdata)[var_count], ylab = "Target Wins")
   scatter.smooth(x=trainingdata_bk[, var_count], y=trainingdata$TARGET_WINS, xlab = names(trainingdata)[var_count], ylab = "Target Wins", col="#999999")
 }
 ```
 
+\newpage
 
 #Appendix B -- Index-wise Results from Predictive Model
 ```{r, echo = FALSE}
@@ -453,6 +479,7 @@ names(appendixB) = c("Index", "Predicted Value", "Index", "Predicted Value")
 pander(appendixB)
 ```
 
+\newpage
 
 #Appendix C -- R Code
 
@@ -745,6 +772,15 @@ predicted_wins <- predict(stepReduced, evaluation_data)
 hist(predicted_wins)
 training_wins = trainingdata_bk$TARGET_WINS
 hist(training_wins, breaks = 8)
+
+evaluation_data_imputed <- evaluation_data
+for (i in 2:ncol(evaluation_data_imputed)){
+  evaluation_data_imputed[, i][is.na(evaluation_data_imputed[, i])] <- median(evaluation_data_imputed[, i], na.rm = TRUE)
+}
+
+par(mfrow = c(1, 1), pin = c(3,2))
+predicted_wins_imputed <- predict(model4, evaluation_data_imputed)
+hist(predicted_wins_imputed)
 
 par(pin = c(3, 1))
 for (var_count in 3:17) {
