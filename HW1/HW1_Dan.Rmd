@@ -1,0 +1,87 @@
+
+<!--move this from Logan's section to end of section 2-->
+#Data Transformation
+
+Many of the more advanced baseball statistics are simply combinations of other statistics (i.e. slugging percentage is total bases divided by at-bats). Using the predictors given in the data set, we wanted to see if combining predictors and/or calculating new values would increase any significance in a model that is trying to predict wins. Total bases and extra bases are both stats that can easily be calculated with the given data. Assuming that the number of doubles, triples and home runs are included in the `TEAM_BATTING_H` variable, we can subtract these out to obtain the number of singles. Adding this to the doubles, triples, and homeruns, each multiplied by the number of bases each is worth (2,3, and 4 respectively) would give total bases. Doing the same thing, but excluding single base hits would give the number of extra bases as well. These two statistics were used in the model, along with many of the other predictors.
+
+Since the fielding errors predictor was drastically right-skewed (see Appendix A), a log transformation was done on this predictor, resulting in a better fit of the model. 
+
+<!--remaining Logan's writeup in Section 3-->
+#Model Creation
+
+#####Model 5: Feature engineering and new variables
+Using a step-wise methodology, less significant predictors such as caught stealing, pitching walks & hits were left out. To avoid including predictors that were related, the base hits/singles and other multiple base hit predictors were left out. Most of the predictors have coefficients that behave the way we would expect, given the predictors effect on the game. The extra bases predictor ended up having a negative coefficient, when we would expect there to be a positive one. This may be due to the fact that it is similar stats that make up these predictors, and there is collinearity between the total bases and extra bases predictors. Removing extra bases from the model results in a lower coefficient for total bases, and an overall lower adjusted $R^2$ value for the model.
+
+
+<!-- new stuff -->
+#Model Selection and Prediction
+The model utilizing only the significant predictors (Model 4) is selected as the best model for prediction of team wins in a 162-game baseball season.  While the R^2 value of this model the second-lowest of the five models tested, its high F-score indicates that it is the most statistically significant.  Additionally, it is the most parsimonious models tested, and the simplicity lends itself to easier understanding of the model by other users.
+
+This model has a root-mean-square error of `r round(summary(model4)$sigma, 4)`, an R^2 of `r round(summary(model4)$r.squared, 2)`, and an F-statistic of `r round(summary(model4)$fstatistic[1], 1)`. The F statistic has a corresponding p-value of <2.2e-16.
+
+The residual plots for this model are presented below:
+
+```{r fit-residuals, echo=FALSE, fig.height=7/3}
+par(mfrow = c(1, 3))
+plot(model4$residuals, main = NULL)
+abline(h = 0, lty = 2)
+hist(model4$residuals, main = NULL)
+qqnorm(model4$residuals, main = NULL)
+qqline(model4$residuals)
+par(mfrow = c(1, 1))
+```
+
+There does not appear to be any pattern in the residuals in the scatterplot, so the condition of linearity can be accepted.  The histogram and Q-Q plot indicate that the residuals are roughly normally distributed, albeit with short tails.  Finally, the scatterplot and Q-Q plot indicate that the residuals indicate near-constant variability.  Because the conditions are met, the validity of the use of a linear model is accepted.
+
+The linear model is applied to an evaluation dataset containing response variables for 259 cases.  A histogram of the predicted team wins is presented below.
+
+```{r evaluation, echo=FALSE}
+evaluation_data <- read.csv('https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-evaluation-data.csv')
+
+predicted_wins <- predict(stepReduced, evaluation_data)
+hist(predicted_wins)
+```
+
+The predicted wins appear roughly normally distributed, with a slight right-skewness.  As expected, the distribution is centered near 82, which represents a 0.500 season.  Further investigation shows that the median is indeed roughly 82 wins, with the mean slightly lower at roughly 81 wins.
+
+Due to missing values, however, there are 89 missing predictions, representing roughly 34% of the total dataset.  In order to allow for predictions of the full 259 cases in the evaluation dataset, missing values are filled with the median for each given missing variable.  The linear model is again applied, this time to the evaluation dataset with imputed median values.  A histogram of the predicted team wins is presented below.
+
+```{r impute-evaluation, echo=FALSE}
+evaluation_data_imputed <- evaluation_data
+for (i in 2:ncol(evaluation_data_imputed)){
+  evaluation_data_imputed[, i][is.na(evaluation_data_imputed[, i])] <- median(evaluation_data_imputed[, i], na.rm = TRUE)
+}
+
+predicted_wins_imputed <- predict(model4, evaluation_data_imputed)
+hist(predicted_wins_imputed)
+```
+
+In contrast to the predictions for the raw evaluation dataset, this set of predictions is left-skewed.  The median and mean for this set of predictions are both roughly 81.  The shape of the distribution, which is seemingly condensed towards the median, suggests that imputation using the median may have introduced a bias towards the center of the distribution (which, again, corresponds to a 0.500 season with 82 wins).  Although it is outside the scope of this investigation, more advanced imputation that will avoid the introduction of bias may be advisable for cases with missing predictors.
+
+A comparison of the full sets of predictions for the evaluation dataset is available in Appendix B.
+
+\newpage
+
+#Appendix A
+```{r, echo = FALSE}
+par(mfrow = c(1,2))
+for (var_count in 3:17) {
+  plot(x = trainingdata_bk[, var_count], y = trainingdata$TARGET_WINS, xlab = names(trainingdata)[var_count], ylab = "Target Wins")
+}
+```
+
+\newpage
+
+#Appendix B: Predictions
+```{r prediction-comparion, echo = FALSE}
+prediction_table <- data.frame(evaluation_data$INDEX, predicted_wins, predicted_wins_imputed)
+names(prediction_table) <- c('INDEX', 'Raw', 'Imputed')
+kable(prediction_table, digits = 0)
+```
+
+\newpage
+
+#Appendix C
+```{r all-code, eval=FALSE}
+
+```
