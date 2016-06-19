@@ -4,6 +4,7 @@ subtitle: "Data 621 Business Analytics and Data Mining"
 author: "Aadi Kalloo, Nathan Lim, Asher Meyers, Daniel Smilowitz, Logan Thomson"
 date: "Due June 19, 2016"
 output: pdf_document
+
 geometry: margin=0.5in
 ---
 
@@ -13,61 +14,69 @@ library(pander)
 library(knitr)
 library(ggplot2)
 library(gridExtra)
+library(reshape2)
+library(MASS)
 
 trainingdata = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/moneyball-training-data.csv")
-####### Mean and Medians Table
-mean_median_df = data.frame(matrix(0, nrow = 17, ncol = 2))
 
-mean2 <- function(x)   {mean(x, na.rm = TRUE)}
-median2 <- function(x) {median(x, na.rm = TRUE)}
+createSummaryTable <- function(trainingdata1) {
+  ####### Mean and Medians Table
+  mean_median_df = data.frame(matrix(0, nrow = ncol(trainingdata1), ncol = 2))
+  
+  mean2 <- function(x)   {mean(x, na.rm = TRUE)}
+  median2 <- function(x) {median(x, na.rm = TRUE)}
+  
+  means = as.data.frame(lapply(trainingdata1, mean2))
+  medians = as.data.frame(lapply(trainingdata1, median2))
+  lengths = as.data.frame(lapply(trainingdata1, length))
+  
+  mean_median_df[, 1] = names(means)
+  mean_median_df[, 2] = t(means[1, ])
+  mean_median_df[, 3] = t(medians[1, ])
+  #mean_median_df[, 4] = t(lengths[1, ])
+  
+  names(mean_median_df) = c("VAR_NAME", "MEAN", "MEDIAN")
+  #kable(mean_median_df, digits = 2)
+  ####################################################
+  
+  ########Correlations to Wins
+  
+  cor_df = data.frame(matrix(0, nrow = ncol(trainingdata1) - 2, ncol = 2))
+  
+  cors = as.data.frame(cor(trainingdata1$TARGET_WINS, trainingdata1[, 3:ncol(trainingdata1)], use = "pairwise.complete.obs"))
+  cor_df[, 1] = names(cors)
+  cor_df[, 2] = t(cors[1, ])
+  
+  names(cor_df) = c("VAR_NAME", "CORRELATION TO WINS (r)")
+  
+  #kable(cor_df, digits = 2)
+  ####################################################
+  
+  ########Missing Values per variable
+  mv_df = data.frame(matrix(0, nrow = ncol(trainingdata1), ncol = 2))
+  
+  num_missing <- function(x)   {sum(is.na(x))}
+  
+  
+  missingvalues = as.data.frame(lapply(trainingdata1, num_missing))
+  mv_df[, 1] = names(missingvalues)
+  mv_df[, 2] = t(missingvalues[1, ])
+  
+  names(mv_df) = c("VAR_NAME", "NUM_MISSING")
+  
+  #kable(mv_df, digits = 2)
+  ####################################################
+  
+  
+  data_exp = merge(mean_median_df, cor_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
+  data_exp = merge(data_exp, mv_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
+  temp = as.data.frame(cbind(mean_median_df[2,], NA, NA))
+  names(temp) = names(data_exp)
+  data_exp = rbind(temp, data_exp)
+}
 
-means = as.data.frame(lapply(trainingdata, mean2))
-medians = as.data.frame(lapply(trainingdata, median2))
-lengths = as.data.frame(lapply(trainingdata, length))
 
-mean_median_df[, 1] = names(means)
-mean_median_df[, 2] = t(means[1, ])
-mean_median_df[, 3] = t(medians[1, ])
-#mean_median_df[, 4] = t(lengths[1, ])
-
-names(mean_median_df) = c("VAR_NAME", "MEAN", "MEDIAN")
-#kable(mean_median_df, digits = 2)
-####################################################
-
-########Correlations to Wins
-
-cor_df = data.frame(matrix(0, nrow = 15, ncol = 2))
-
-cors = as.data.frame(cor(trainingdata$TARGET_WINS, trainingdata[, 3:17], use = "pairwise.complete.obs"))
-cor_df[, 1] = names(cors)
-cor_df[, 2] = t(cors[1, ])
-
-names(cor_df) = c("VAR_NAME", "CORRELATION TO WINS (r)")
-
-#kable(cor_df, digits = 2)
-####################################################
-
-########Missing Values per variable
-mv_df = data.frame(matrix(0, nrow = 17, ncol = 2))
-
-num_missing <- function(x)   {sum(is.na(x))}
-
-
-missingvalues = as.data.frame(lapply(trainingdata, num_missing))
-mv_df[, 1] = names(missingvalues)
-mv_df[, 2] = t(missingvalues[1, ])
-
-names(mv_df) = c("VAR_NAME", "NUM_MISSING")
-
-#kable(mv_df, digits = 2)
-####################################################
-
-
-data_exp = merge(mean_median_df, cor_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
-data_exp = merge(data_exp, mv_df, by.x = "VAR_NAME", by.y = "VAR_NAME")
-temp = as.data.frame(cbind(mean_median_df[2,], NA, NA))
-names(temp) = names(data_exp)
-data_exp = rbind(temp, data_exp)
+trainingdata_bk = trainingdata
 ```
 
 
@@ -76,9 +85,13 @@ data_exp = rbind(temp, data_exp)
 
 The data analyzed in this report includes 2276 professional baseball teams for the years 1871-2006. In total, 16 variables were present in the data provided. Included below is a summary of descriptive statistics, correlations to wins, and the number of missing values for each variable in the provided data set:
 
+####Table 1
 ```{r, echo = FALSE}
+data_exp = createSummaryTable(trainingdata)
 kable(data_exp)
 ```
+
+It can be seen that there are missing values in 6 of the variables in the data set, and these missing values range from approximately 5-92% of the data provided for their respective variables. However, in only two exceptions do the missing data account for more than 11% of the missing data. 
 
 Below are graphs that show the relationship to _Target Wins_ for the three variables with the highest correlation coefficient: 
 
@@ -90,19 +103,82 @@ for (plot_count in c(3, 4, 7)) {
 }
 ```
 
-The full array of correlations graphs may be found in Appendix A. 
-<!-- -->
+As can be seen from Table 1, there are few variables that have any particularly strong correlation with `TARGET_WINS`.The full array of scatterplots representing correlations between `TARGET_WINS` and other variables may be found in Appendix A. 
+
+The distribution of values and outliers is also of significant importance in understanding the baseball data set. Here it can be seen that many variables have a skewed distribution:
+
+```{r, echo = FALSE}
+trainingDataRaw = trainingdata
+data_no_index <- trainingDataRaw[,c(2:17)] # delete index
+
+for (i in 1:16) {
+  data_no_index[,i][is.na(data_no_index[,i])] = median(data_no_index[,i], na.rm = TRUE)
+}
+
+df_new=data_no_index
+
+par(mfrow = c(6,3))
+
+m <- melt(df_new)
+p <- ggplot(m, aes(factor(variable), value)) 
+p + geom_boxplot() + facet_wrap(~variable, scale="free")
+```
+
+In summary, the baseball data set provided includes many variables with a skewed distribution, few variables that correlate well with `TARGET_WINS`, and several variables that have missing data and should either require data imputation or should be excluded. The following sections serve to review these issues and go on to create a working regression model that can predict `TARGET_WINS`.
 
 #Data Preparation
 
-It was determined that the _Hits By Pitch_ variable had too many missing values to be useful for regression, and thus this variable was excluded from the model building process.  
+It was determined that the _Hits By Pitch_ variable had too many missing values to be useful for regression, and thus this variable was excluded from the model building process. As shown in Table 1 above, there are several variables that have missing values. The attempted solution to this problem involved imputation using the median for each variable in the data set. A summary of the data is shown here again for inspection and confirmation of similarity between the old and new data sets:
+
+
+#####Missing Values Imputed With Median
+```{r, echo = FALSE}
+trainingDataRaw = trainingdata
+data_no_index <- trainingDataRaw[,c(2:17)] # delete index
+
+for (i in 1:16) {
+  data_no_index[,i][is.na(data_no_index[,i])] = median(data_no_index[,i], na.rm = TRUE)
+}
+
+df_new=data_no_index
+#summary(df_new)
+imp_data = createSummaryTable(df_new)
+kable(imp_data)
+trainingdata = df_new
+```
+
+The dataset contains 17 columns - an index column (INDEX), a response column (TARGET_WINS) and 15 predictor columns. There are 2,276 observations - but there are many missing values for many of the predictors. 
+
+Two predictors in particular stand out:
+```{r, echo = FALSE}
+a = c("TEAM_BATTING_HBP", "Batters hit by pitch (free base)", "Positive", "91.6%", "0.07", "0.31")
+b = c("TEAM_BASERUN_CS", "Strikeouts by batters", "Negative", "33.9%", "0.02", "0.39")
+
+names(a) = c("Predictor Name", "Description", "Impact", "% Missing", "r with Response", "p-Value")
+names(b) = names(a)
+c = as.data.frame(rbind(a, b))
+kable(c)
+```
+
+Including these predictors in our dataset would mean that we would either have to a) forgo a significant chunk of our data (34% or 92%) or b) impute a large number of data points.  Their correlation coefficients with the response are less than an absolute value of 7%; the p values of a simple one variable linear regression using them and the response yields models of no statistical significance (i.e. p > 0.05). Thus, it seems safe to exclude these predictors from our models. This way, we avoid the twin pitfalls of mass exclusion and imputation.
+
+Further exclusions to the data were made:
+
+Exclusion | Explanation
+---------------------------|---------------------------------------------
+INDEX == 1347 | This row had a suspicious set of zero entries
+TEAM_BATTING_BB == 0 | Anomalously low walk count (expected occurences of a zero value for this predictor are zero)
+TEAM_BATTING_SO | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_strike2.shtml)
+TEAM_BATTING_HR | Outside of recognized records [link](http://www.baseball-almanac.com/recbooks/rb_hr7.shtml)
+
+It should be noted that the records excluded from the first two rows of the table above are the same exact points (which would technically make the second exclusion redundant...). That suggests that for whatever reason, strikeouts were not recorded for those rows, but were marked as zero. Those two predictors have the same number of NA values, 102, suggesting their recording method was linked somehow.
 
 #Model Creation
 
 #####Load Data
 
 ```{r, echo = FALSE}
-trainingDataRaw = trainingdata
+trainingDataRaw = trainingdata_bk
 data_no_index <- trainingDataRaw[,c(2:17)] # delete index
 ```
 
@@ -117,37 +193,40 @@ summary(df_new)
 ```
 
 
-
 ####Use all the variables to see p value of each variables.
 ```{r}
-Fullmodel <- lm(TARGET_WINS ~ . , df_new)
-summary(Fullmodel)
+fit_all <- lm(TARGET_WINS ~ . , df_new)
+summary(fit_all)
 ```
-We would like to use significant variables first for modeling.
+
+
+
+
+
+
+
 
 
 ####Model --(Nathan)
 
 ```{r}
 
-model2<- lm(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB + TEAM_FIELDING_E + TEAM_FIELDING_DP, df_new)
+g1 <- ggplot(df_new, aes(x=TEAM_FIELDING_E)) + geom_histogram(binwidth = 10)
+g2 <- ggplot(df_new, aes(x=log(TEAM_FIELDING_E))) + geom_histogram(binwidth = 0.05)
+grid.arrange(g1, g2, ncol=2)
 
-summary(model2)
-```
-Its F-statistic p-value is < 2.2e-16, R-squared:  0.2829
+model2<- lm(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB + TEAM_FIELDING_DP + 
+              log(TEAM_FIELDING_E), df_new)
 
-
-```{r}
-pairs(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB  + TEAM_FIELDING_E  + TEAM_FIELDING_DP, df_new, upper.panel = panel.smooth, lower.panel = NULL)
-```
-
-
-```{r}
 par(mfrow=c(2,2)); plot(model2)
-par(mfrow=c(1,1)); plot(model2$residuals); abline(h=0, col='red');
-plot(fitted(model2), residuals(model2)); abline(h=0, col='red')
+par(mfrow=c(1,1)); plot(model2$residuals)
+summary(model2)
+
+plot(fitted(model2), residuals(model2))
+abline(h=0, col='red')
+
 ```
-When we see qqplot, it is normally distributed quite well. The residuals also are randomlly distributed.
+
 
 
 
@@ -156,8 +235,8 @@ When we see qqplot, it is normally distributed quite well. The residuals also ar
 #####Model 1
 
 ```{r}
-#dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
-dfraw = trainingdata
+dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+
 dfremove <- subset(dfraw, TEAM_BATTING_SO == 0 | TEAM_PITCHING_SO == 0 | TEAM_BASERUN_SB == 0 | TEAM_BATTING_BB == 0 | TEAM_PITCHING_SO > 2500 | TEAM_PITCHING_BB == 0 )$INDEX #Identify rows for removal, have zero strikeouts or bases stolen
 df <- subset(dfraw, !(INDEX %in% dfremove))
 head(df)
@@ -184,7 +263,7 @@ df1$TEAM_BATTING_HRP <- df1$TEAM_BATTING_HR/df1$TEAM_BATTING_H #Home runs as a p
 
 #####Create a linear model using all predictors. The INDEX column is excluded.
 ```{r}
-FullModel <- lm(TARGET_WINS ~.-INDEX, trainingdata)
+FullModel <- lm(TARGET_WINS ~.-INDEX, dfraw)
 summary(FullModel) #Summary of full model
 ```
 
@@ -216,7 +295,7 @@ plot(stepFull) #Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
 
 #####Evaluation of Stepwise model without TEAM_BATTING_HBP
 ```{r}
-trainingDataRaw = trainingdata
+trainingDataRaw = trainingdata_bk
 ReducedModel <- lm(TARGET_WINS ~., trainingDataRaw[,c(2:10, 12:17)])
 summary(ReducedModel)
 stepReduced <- step(ReducedModel)
@@ -226,3 +305,19 @@ rmseStepR
 ```
 
 #Model Selection and Prediction
+
+
+
+#Appendix A
+```{r, echo = FALSE}
+par(mfrow = c(1,2))
+for (var_count in 3:17) {
+  plot(x = trainingdata_bk[, var_count], y = trainingdata$TARGET_WINS, xlab = names(trainingdata)[var_count], ylab = "Target Wins")
+}
+```
+
+
+#Appendix B
+
+
+#Appendix C
