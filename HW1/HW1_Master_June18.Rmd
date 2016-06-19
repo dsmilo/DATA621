@@ -157,6 +157,7 @@ abline(h=0, col='red')
 |1|11|0.31|95|2.2e-16|13.07|2264
 |2|8|0.22|82|2.2e-16|13.82|2266
 |3|7|0.35|157|2.2e-16|11.07|1993
+|4|4|0.24|157|2.2e-16|11.78|1932
 
 
 #####Model 1: Simple Full Linear Regression, With Removal of Non-Significant Predictors
