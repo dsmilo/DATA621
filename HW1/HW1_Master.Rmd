@@ -195,15 +195,11 @@ summary(df_new)
 
 ####Use all the variables to see p value of each variables.
 ```{r}
-fit_all <- lm(TARGET_WINS ~ . , df_new)
-summary(fit_all)
+Fullmodel <- lm(TARGET_WINS ~ . , df_new)
+summary(Fullmodel)
 ```
 
-
-
-
-
-
+We would like to use significant variables first for modeling.
 
 
 
@@ -211,24 +207,27 @@ summary(fit_all)
 
 ```{r}
 
-g1 <- ggplot(df_new, aes(x=TEAM_FIELDING_E)) + geom_histogram(binwidth = 10)
-g2 <- ggplot(df_new, aes(x=log(TEAM_FIELDING_E))) + geom_histogram(binwidth = 0.05)
-grid.arrange(g1, g2, ncol=2)
+model2<- lm(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB + TEAM_FIELDING_DP + TEAM_FIELDING_E, df_new)
+summary(model2)
+```
+Its F-statistic p-value is < 2.2e-16, R-squared:  0.2829.
+We also can see all the variables are significant.
 
-model2<- lm(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB + TEAM_FIELDING_DP + 
-              log(TEAM_FIELDING_E), df_new)
 
+```{r}
+ pairs(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB  + TEAM_FIELDING_E  + TEAM_FIELDING_DP, df_new, upper.panel = panel.smooth, lower.panel = NULL)
+```
+
+
+```{r}
 par(mfrow=c(2,2)); plot(model2)
-par(mfrow=c(1,1)); plot(model2$residuals)
+par(mfrow=c(1,1)); plot(model2$residuals); abline(h=0, col='red')
 summary(model2)
 
 plot(fitted(model2), residuals(model2))
 abline(h=0, col='red')
-
 ```
-
-
-
+When we see qqplot, it is normally distributed quite well. The residuals also are randomlly distributed.
 
 
 
