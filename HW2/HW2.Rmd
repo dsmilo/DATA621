@@ -1,9 +1,11 @@
 ```{r}
+install.packages("zoo")
+require("zoo")
 raw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW2/Data/classification-output-data.csv"))
+
 (ctable <- table(raw[ , c(10,9)])) #Columns are
 (cm <- as.data.frame.matrix(ctable))
 (cm <- cm[2:1,2:1]) #Reorder table to follow positives in top left convention, negatives on bottom right. 
-
 #________Actual Pos   Neg
 #Pred Positive [TP    FP]
 #Pred Negative [FN    TN]
@@ -23,7 +25,7 @@ erroneousness <- function(df){
   (cm[1,2] + cm[2,1])/sum(cm[,])
 }
 
-accuracy(df) + erroneousness(df) == 1
+accuracy(df) + erroneousness(df) == 1 #Evaluates to true, demonstrating that accuracy and the error rate are calculating correctly,
 
 precision <- function(df){
   cm <- confusion(df)
@@ -43,4 +45,33 @@ specificity <- function(df){
 F1 <- function(df){
   2*precision(df)*sensitivity(df)/(precision(df) + sensitivity(df))
 }
+
+
+orderdf <- function(raw) {
+  data <- raw[,c("scored.class","class","scored.probability")]
+  data <- data[order(data$scored.probability),]
+  data$index <- c(1:nrow(data))
+  data$count <- round(data$index/nrow(data),3)
+  data$target <- round(cumsum(data$class)/sum(data$class),3)
+  data$lift <- round(data$target/data$count,3)
+  data
+}
+
+ROCf <- function(df) {
+  specVec <- c()
+  senseVec <- c()
+  for (i in 1:100) {
+    df$scored.class <- ifelse(df$scored.probability > i*0.01, 1, 0)
+    specVec <- append(specVec, 1-specificity(df))
+    senseVec <- append(senseVec, sensitivity(df))
+  }
+  plot(specVec, senseVec, xlab = "1 - Specificity", ylab = "Sensitivity", main = "ROC Chart", col = "blue")
+  AUC <- -1*sum(diff(na.omit(specVec))*rollmean(na.omit(senseVec),2)) #Riemann sums integration, rectangles under curve
+  AUC
+  #na.omit(data.frame("specVec" = specVec, "senseVec" = senseVec))
+  
+}
+
+ROCf(raw)
+#ROCdf <- ROCf(raw)
 ```
