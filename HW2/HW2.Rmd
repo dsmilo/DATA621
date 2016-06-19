@@ -1,8 +1,9 @@
+```{r}
 raw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW2/Data/classification-output-data.csv"))
-
 (ctable <- table(raw[ , c(10,9)])) #Columns are
 (cm <- as.data.frame.matrix(ctable))
 (cm <- cm[2:1,2:1]) #Reorder table to follow positives in top left convention, negatives on bottom right. 
+
 #________Actual Pos   Neg
 #Pred Positive [TP    FP]
 #Pred Negative [FN    TN]
@@ -42,3 +43,4 @@ specificity <- function(df){
 F1 <- function(df){
   2*precision(df)*sensitivity(df)/(precision(df) + sensitivity(df))
 }
+```
