@@ -1,0 +1,63 @@
+---
+title: "HW2_nathanlim"
+author: "NathanLim"
+date: "June 19, 2016"
+output: html_document
+---
+
+2. Use the table() function to get the raw confusion matrix for this scored dataset.
+```{r}
+df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW2/Data/classification-output-data.csv"))
+head(df)
+(confusion <- table(select(df, class, scored.class)))
+```
+
+3. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
+and returns the accuracy of the predictions.
+
+```{r}
+accuracy_function <- function(df){
+  confusion <- table(select(df, class, scored.class))
+  accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
+  return(accuracy)
+}
+
+accuracy_function(df)
+```
+
+4. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
+and returns the classification error rate of the predictions.
+
+
+```{r}
+CER_function<- function(df){
+  confusion <- table(select(df, class, scored.class))
+  classification_error_rate <- (confusion[1,2] + confusion[2,1])/sum(confusion)
+  return(classification_error_rate)
+}
+
+CER_function(df)
+```
+
+Verify by summing the rates
+```{r}
+accuracy_function(df) +  CER_function(df)
+```
+
+
+5. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the precision of the predictions.
+
+
+```{r}
+precision_function <- function(df){
+  confusion <- table(select(df, class, scored.class))
+  precision <- confusion[2,2]/(confusion[1,2] + confusion[2,2])
+  return(precision)
+}
+
+precision_function(df)
+```
+
+
+6. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified,
+and returns the sensitivity of the predictions. Sensitivity is also known as recall.
