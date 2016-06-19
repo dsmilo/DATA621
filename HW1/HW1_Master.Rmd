@@ -16,6 +16,7 @@ library(ggplot2)
 library(gridExtra)
 library(reshape2)
 library(MASS)
+library(leaps)
 
 trainingdata = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/moneyball-training-data.csv")
 
@@ -174,138 +175,250 @@ TEAM_BATTING_HR | Outside of recognized records [link](http://www.baseball-alman
 It should be noted that the records excluded from the first two rows of the table above are the same exact points (which would technically make the second exclusion redundant...). That suggests that for whatever reason, strikeouts were not recorded for those rows, but were marked as zero. Those two predictors have the same number of NA values, 102, suggesting their recording method was linked somehow.
 
 #Model Creation
+#####Model Summary Table
 
-#####Load Data
+|Model #|# of Predictors|Adj. R^2|F-Statistic|P-Value|Residual Standard Error|Degrees of Freedom|
+|---|---|---|---|---|---|---|
+|1|11|0.31|95|2.2e-16|13.07|2264
+|2|8|0.22|82|2.2e-16|13.82|2266
+|3|7|0.35|157|2.2e-16|11.07|1993
+|4|4|0.28|225|2.2e-16|11.78|2271
+|5|8|0.31|125|2.2e-16|13.15|2267
+
+
+#####Model 1: Simple Full Linear Regression, With Removal of Non-Significant Predictors
+Description: Missing values were replaced with the median values from the associated predictor, to retain all data points for making a regression; a linear regression was fit to all predictors; All non-significant predictors (p<.05) were removed sequentially. The final iteration of this regression model is shown here:
+
 
 ```{r, echo = FALSE}
-trainingDataRaw = trainingdata_bk
-data_no_index <- trainingDataRaw[,c(2:17)] # delete index
-```
-
-
-#####Imputing Missing values with median
-```{r}
-for (i in 1:16){
-data_no_index[,i][is.na(data_no_index[,i])] <-  median(data_no_index[,i], na.rm = TRUE)
-}
-df_new=data_no_index
-summary(df_new)
-```
-
-
-####Use all the variables to see p value of each variables.
-```{r}
-Fullmodel <- lm(TARGET_WINS ~ . , df_new)
-summary(Fullmodel)
-```
-
-We would like to use significant variables first for modeling.
-
-
-
-####Model --(Nathan)
-
-```{r}
-
-model2<- lm(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB + TEAM_FIELDING_DP + TEAM_FIELDING_E, df_new)
-summary(model2)
-```
-Its F-statistic p-value is < 2.2e-16, R-squared:  0.2829.
-We also can see all the variables are significant.
-
-
-```{r}
- pairs(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB  + TEAM_FIELDING_E  + TEAM_FIELDING_DP, df_new, upper.panel = panel.smooth, lower.panel = NULL)
-```
-
-
-```{r}
-par(mfrow=c(2,2)); plot(model2)
-par(mfrow=c(1,1)); plot(model2$residuals); abline(h=0, col='red')
-summary(model2)
-
-plot(fitted(model2), residuals(model2))
-abline(h=0, col='red')
-```
-When we see qqplot, it is normally distributed quite well. The residuals also are randomlly distributed.
-
-
-
-#####Model 1
-
-```{r}
 dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+data_no_index <- dfraw[ ,c(2:17)] #Remove INDEX column
+for (i in 1:16) {
+  data_no_index[,i][is.na(data_no_index[,i])] <-  median(data_no_index[,i], na.rm = TRUE)
+}
+df_new <- data_no_index
+#summary(df_new)
 
-dfremove <- subset(dfraw, TEAM_BATTING_SO == 0 | TEAM_PITCHING_SO == 0 | TEAM_BASERUN_SB == 0 | TEAM_BATTING_BB == 0 | TEAM_PITCHING_SO > 2500 | TEAM_PITCHING_BB == 0 )$INDEX #Identify rows for removal, have zero strikeouts or bases stolen
+
+fit <- lm(TARGET_WINS~., df_new)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_PITCHING_BB)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_HBP)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_BASERUN_CS)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_PITCHING_HR)
+pander(summary(fit))
+```
+
+```{r, echo = FALSE}
+fit <- lm(TARGET_WINS~., df_new)
+#pander(summary(fit))
+fit <- update(fit, .~.-TEAM_PITCHING_BB)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_HBP)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_BASERUN_CS)
+#summary(fit)
+```
+
+```{r, echo = FALSE}
+fit <- update(fit, .~.-TEAM_PITCHING_HR)
+pander(summary(fit))
+
+model1 = fit
+```
+
+
+#####Model 2: SLR Bounded by Recent MLB Data (1962-)
+
+Description: Missing values were replaced with the median values from the associated predictor. Data was compared against records from 1962 and onwards, aka the MLB dataset, and data outside the bounds of that external dataset were replaced with the medians of the associated predictor. Eg, if one of the records in our dataset had more home runs hit than in all of the MLB dataset, then that home run data point was replaced with the median home run figure in our dataset.
+
+Then, a linear regression was fitted to all predictors; predictors were removed in order of significance, to obtain a model with a higher f-statistic.
+
+
+```{r, echo = FALSE}
+dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+dfremove <- subset(dfraw, INDEX == 1347)$INDEX 
 df <- subset(dfraw, !(INDEX %in% dfremove))
-head(df)
-df1 <- df[, -c(1,10,11)] #Remove caught stealing and hit by pitcher variables
-#View(df)
-#View(df1)
-#summary(df)
+data_no_index <- df[ ,c(2:17)] #Remove INDEX column
+for (i in 1:16) {
+  data_no_index[,i][is.na(data_no_index[,i])] <-  median(data_no_index[,i], na.rm = TRUE)
+}
+df <- data_no_index
+MLB <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/MLB.Stats.1962-2015.csv"))
 
-df$TEAM_BATTING_HSO <- df$TEAM_BATTING_H/df$TEAM_BATTING_SO #Ratio of hits to strikeouts
+df$TEAM_BATTING_BB <- ifelse(df$TEAM_BATTING_BB < min(MLB$BB) | df$TEAM_BATTING_BB > max(MLB$BB), median(df$TEAM_BATTING_BB), df$TEAM_BATTING_BB)
+df$TEAM_BATTING_H <- ifelse(df$TEAM_BATTING_H < min(MLB$H) | df$TEAM_BATTING_H > max(MLB$H), median(df$TEAM_BATTING_H), df$TEAM_BATTING_H)
+df$TEAM_BATTING_2B <- ifelse(df$TEAM_BATTING_2B < min(MLB$X2B) | df$TEAM_BATTING_2B > max(MLB$X2B), median(df$TEAM_BATTING_2B), df$TEAM_BATTING_2B)
+df$TEAM_BATTING_3B <- ifelse(df$TEAM_BATTING_3B < min(MLB$X3B) | df$TEAM_BATTING_3B > max(MLB$X3B), median(df$TEAM_BATTING_3B), df$TEAM_BATTING_3B)
+df$TEAM_BATTING_HR <- ifelse(df$TEAM_BATTING_HR < min(MLB$HR) | df$TEAM_BATTING_HR > max(MLB$HR), median(df$TEAM_BATTING_HR), df$TEAM_BATTING_HR)
+df$TEAM_BATTING_SO <- ifelse(df$TEAM_BATTING_SO < min(MLB$SO) | df$TEAM_BATTING_SO > max(MLB$SO), median(df$TEAM_BATTING_SO), df$TEAM_BATTING_SO)
+df$TEAM_PITCHING_SO <- ifelse(df$TEAM_PITCHING_SO < min(MLB$SO.1) | df$TEAM_PITCHING_SO > max(MLB$SO.1), median(df$TEAM_PITCHING_SO), df$TEAM_PITCHING_SO)
+df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < min(MLB$SB) | df$TEAM_BASERUN_SB > max(MLB$SB), median(df$TEAM_BASERUN_SB), df$TEAM_BASERUN_SB)
 
-fit1 <- lm(TARGET_WINS~.-TEAM_PITCHING_HR-TEAM_BATTING_SO-TEAM_BATTING_H, df)#Non-significant predictors removed
-summary(fit1)
-step1 <- step(fit1)
-summary(step1)
+fit <- lm(TARGET_WINS~.,df)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_PITCHING_SO)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_3B)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_HBP)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_PITCHING_BB)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_BASERUN_CS)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_PITCHING_H)
+#summary(fit)
+fit <- update(fit, .~.-TEAM_BATTING_HR)
+pander(summary(fit))
 
-#Correlation Matrix
-#View(round(cor(df1),2))
+model2 = fit
+```
+
+#####Model 3: Data Bounded by 1880-2015 Records
+Three predictors were removed:
+Predictors removed, due to high NA count: TEAM_BATTING_HBP and TEAM_BASERUN_CS
+Predictor removed, due to lack of relevance: TEAM_FIELDING_DP
+
+Bounds for predictors were set by minimum and maximum all-time MLB records, with citations shown in the code. Where our records were outside the bounds of these external records, they were replaced with NA values.
+Predictors were removed sequentially removed, in order of significance; multiple predictors were created and tested, in the hopes of improving fit statistics, and one proved useful - the number of 1st base hits. This predictor was then added to the model.
+```{r, echo = FALSE}
+#Model 3 using 1880- Data
+dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+dfremove <- subset(dfraw, INDEX == 1347)$INDEX 
+df <- subset(dfraw, !(INDEX %in% dfremove))
+df <- df[, -c(1,10,11,17)] #Remove caught stealing and hit by pitcher variables and fielding double play, due to too many NAs (CS and HBP) and lack of relevance (DP)
+
+df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < 13 | df$TEAM_BASERUN_SB > 638, NA, df$TEAM_BASERUN_SB) 
+#http://www.baseball-almanac.com/recbooks/rb_stba2.shtml
+df$TEAM_BATTING_3B <- ifelse(df$TEAM_BATTING_3B < 11 | df$TEAM_BATTING_3B > 153, NA, df$TEAM_BATTING_3B)
+#http://www.baseball-almanac.com/rb_trip2.shtml
+df$TEAM_BATTING_HR <- ifelse(df$TEAM_BATTING_HR < 3 | df$TEAM_BATTING_HR > 264, NA, df$TEAM_BATTING_HR)
+#http://www.baseball-almanac.com/recbooks/rb_hr7.shtml
+df$TEAM_BATTING_SO <- ifelse(df$TEAM_BATTING_SO < 308 | df$TEAM_BATTING_SO > 1535, NA, df$TEAM_BATTING_SO)
+#http://www.baseball-almanac.com/recbooks/rb_strike2.shtml
+df$TEAM_PITCHING_SO <- ifelse(df$TEAM_PITCHING_SO < 333 | df$TEAM_PITCHING_SO > 1450, NA, df$TEAM_PITCHING_SO) 
+#http://www.baseball-almanac.com/recbooks/rb_strik.shtml
+df$TEAM_BASERUN_SB <- ifelse(df$TEAM_BASERUN_SB < 13 | df$TEAM_BASERUN_SB > 638, NA, df$TEAM_BASERUN_SB) 
+#http://www.baseball-almanac.com/recbooks/rb_stba2.shtml
+
+fit <- lm(TARGET_WINS~.,df)
+#summary(fit)
+fit1 <- update(fit, .~.-TEAM_BATTING_H)
+#summary(fit1)
+
+fit2 <- update(fit1, .~.-TEAM_PITCHING_HR)
+#summary(fit2)
+fit3 <- update(fit2, .~.-TEAM_PITCHING_SO)
+#summary(fit3)
+
+
+fit4 <- update(fit3, .~.-TEAM_BATTING_2B) 
+#summary(fit4)
+fit5 <- update(fit4, .~.-TEAM_PITCHING_BB)
+#summary(fit5)
+fit6 <- update(fit5, .~.-TEAM_PITCHING_H) 
+#summary(fit6)
+
+df$TEAM_BATTING_1B <- df$TEAM_BATTING_H - df$TEAM_BATTING_2B - df$TEAM_BATTING_3B - df$TEAM_BATTING_HR #Singles - 1st Base Hits
+fit7 <- update(fit6,.~.+TEAM_BATTING_1B)
+pander(summary(fit7))
+
+pairs(~TARGET_WINS + TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB +TEAM_FIELDING_E, df, upper.panel = panel.smooth, lower.panel = NULL)
+
 
 #These are variables that I tried but didn't turn out to be valuable
-df1$TEAM_BATTING_1B <- df1$TEAM_BATTING_H - df1$TEAM_BATTING_2B - df1$TEAM_BATTING_3B - df1$TEAM_BATTING_HR #Singles - 1st Base Hits
-df1$TEAM_BATTING_HRP <- df1$TEAM_BATTING_HR/df1$TEAM_BATTING_H #Home runs as a percentage of base hits
+
+df$TEAM_BATTING_HRP <- df$TEAM_BATTING_HR/df$TEAM_BATTING_H #Home runs as a percentage of base hits
+#summary(update(fit6,.~.+TEAM_BATTING_HRP))
+
+df$TEAM_BATTING_HSO <- df$TEAM_BATTING_H/df$TEAM_BATTING_SO #Ratio of hits to strikeouts
+#summary(update(fit6,.~.+TEAM_BATTING_HSO))
+model3 = fit7
+```
+
+#####Model 4: Using only significant predictors from model using all variables
+When the model using all variables to predict `TARGET_WINS` was considered, it was decided to create a new model using only the most significant predictors from that regression. This method uses 4 variables only: Base hits by batters, Stolen Bases, Double plays, and Errors. This model produced an F statistic of 225 and $R^2$ = 0.283. 
+```{r, echo = FALSE}
+model4 <- lm(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB + TEAM_FIELDING_DP + TEAM_FIELDING_E, df_new)
+pander(summary(model4))
+```
+
+```{r, echo = FALSE}
+pairs(TARGET_WINS ~  TEAM_BATTING_H + TEAM_BASERUN_SB  + TEAM_FIELDING_E  + TEAM_FIELDING_DP, df_new, upper.panel = panel.smooth, lower.panel = NULL)
+
+```
+
+```{r, echo = FALSE}
+par(mfrow=c(2,2)); plot(model4)
+#par(mfrow=c(1,1)); plot(model4$residuals); abline(h=0, col='red')
+pander(summary(model4))
+
+plot(fitted(model4), residuals(model4))
+abline(h=0, col='red')
+```
+
+#####Model 5: Feature engineering and new variables
+
+Many of the more advanced baseball statistics are simply combinations of other statistics (i.e. slugging percentage is total bases divided by at-bats). Using the predictors given in the data set, we wanted to see if combining predictors and/or calculating new values would increase any significance in a model that is trying to predict wins. Total bases and extra bases are both stats that can easily be calculated with the given data. Assuming that the number of doubles, triples and home runs are included in the `TEAM_BATTING_H` variable, we can subtract these out to obtain the number of singles. Adding this to the doubles, triples, and homeruns, each multiplied by the number of bases each is worth (2,3, and 4 respectively) would give total bases. Doing the same thing, but excluding single base hits would give the number of extra bases as well. These two statistics were used in the model, along with many of the other predictors. Using a step-wise methodology, less significant predictors such as caught stealing, pitching walks & hits were left out. To avoid including predictors that were related, the base hits/singles and other multiple base hit predictors were left out. Since the fielding errors predictor was drastically right-skewed, a log transformation was done on this predictor, resulting in a better fit of the model. Most of the predictors have coefficients that behave the way we would expect, given the predictors effect on the game. The extra bases predictor ended up having a negative coefficient, when we would expect there to be a positive one. This may be due to the fact that it is similar stats that make up these predictors, and there is collinearity between the total bases and extra bases predictors. Removing extra bases from the model results in a lower coefficient for total bases, and an overall lower adjusted $R^2$ value for the model.
+
+```{r, echo = FALSE}
+
+# Get Singles from Base Hits
+df_new$TEAM_BATTING_1B <- with(df_new, TEAM_BATTING_H - TEAM_BATTING_2B - TEAM_BATTING_3B - TEAM_BATTING_HR)
+
+# Create Extra Bases and Total Bases predictors
+df_new$TEAM_BATTING_XTRA_BASE <- with(df_new, TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR)
+
+df_new$TEAM_BATTING_TOT_BASES <- with(df_new, TEAM_BATTING_1B + (2*TEAM_BATTING_2B) + (3*TEAM_BATTING_3B) + (4*TEAM_BATTING_HR))
+
+
+lt_model3 <- lm(TARGET_WINS ~ TEAM_BATTING_TOT_BASES + TEAM_BATTING_XTRA_BASE + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_HR + log(TEAM_FIELDING_E) + TEAM_FIELDING_DP, df_new)
+
+
+boxcox((TARGET_WINS + 1) ~ TEAM_FIELDING_E, data=df_new, lambda = seq(1.2, 1.5, length=10)) #MASS package
+
+pander(summary(lt_model3))
+
 ```
 
 
-#####Create a linear model using all predictors. The INDEX column is excluded.
-```{r}
-FullModel <- lm(TARGET_WINS ~.-INDEX, dfraw)
-summary(FullModel) #Summary of full model
-```
-
-
-#####Put full model through stepwise regression, where predictors with less significance are sequentially removed.
-```{r}
-stepFull <- step(FullModel) 
-summary(stepFull)
-
-```
-
-
-```{r}
-#####Generate predictions using the stepFull model
-predictionsStepFull <- predict(stepFull, trainingDataRaw) 
-#View(predictionsStepFull)
-```
-
-#####Generate the RMSE of the stepFull model
-```{r}
-rmseStep <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepFull)] - predictionsStepFull[!is.na(predictionsStepFull)])^2)) 
-rmseStep
-```
-
-```{r}
-par(mfrow=c(2,2)) #Set up a four panel plot for evaluating regression
-plot(stepFull) #Displays Residuals vs Fitted, Scale-Location,  and Normal Q-Q.
-```
-
-#####Evaluation of Stepwise model without TEAM_BATTING_HBP
-```{r}
-trainingDataRaw = trainingdata_bk
-ReducedModel <- lm(TARGET_WINS ~., trainingDataRaw[,c(2:10, 12:17)])
-summary(ReducedModel)
-stepReduced <- step(ReducedModel)
-predictionsStepReduced <- predict(stepReduced, trainingDataRaw[,c(2:10, 12:17)])
-rmseStepR <- sqrt(mean((trainingDataRaw$TARGET_WINS[!is.na(predictionsStepReduced)] - predictionsStepReduced[!is.na(predictionsStepReduced)])^2))
-rmseStepR
-```
 
 #Model Selection and Prediction
+The reduced step-wise model described above is selected as the best model for prediction of team wins in a 162-game baseball season.  While the R^2 value of this model is not the highest of the models tested, its high F-score indicates that it is the most statistically significant.  Additionally, it is one of the more parsimonious models tested, and the simplicity of the model lends itself to easier understanding of the model by possible implementers of the model.
+```{r, echo = FALSE}
+stepReduced = model4
+```
 
 
+This model has a root-mean-square error of `r round(summary(stepReduced)$sigma, 4)`, an R^2 of `r round(summary(stepReduced)$r.squared, 2)`, and an F-statistic of `r round(summary(stepReduced)$fstatistic[1], 1)`. The F statistic has a corresponding p-value of <2.2e-16.
+
+The residual plots for this model are presented below:
+
+```{r fit-residuals, echo=FALSE, fig.height=7/3}
+par(mfrow = c(1, 3))
+plot(stepReduced$residuals, main = NULL)
+hist(stepReduced$residuals, main = NULL)
+qqnorm(stepReduced$residuals, main = NULL)
+qqline(stepReduced$residuals)
+par(mfrow = c(1, 1))
+```
+
+There does not appear to be any pattern in the residuals in the scatterplot, so the condition of linearity can be accepted.  The histogram indicates that the residuals are normally distributed.  Finally, the scatterplot and Q-Q plot indicate that the residuals indicate near-constant variability.  Because the conditions are met, the validity of the use of a linear model is accepted.
+
+The linear model is applied to an evaluation dataset containing response variables for 259 cases.  A histogram of the predicted team wins is presented below.
+
+```{r evaluation, echo=FALSE}
+evaluation_data <- read.csv('https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-evaluation-data.csv')
+
+predicted_wins <- predict(stepReduced, evaluation_data)
+hist(predicted_wins)
+```
+
+The predicted wins appear roughly normally distributed, with a slight right-skewness.  As expected, the distribution is centered near 82, which represents a 0.500 season.  Further investigation shows that the median is indeed roughly 82 wins, with the mean slightly lower at roughly 81 wins.
 
 #Appendix A
 ```{r, echo = FALSE}
