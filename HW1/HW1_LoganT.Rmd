@@ -61,6 +61,12 @@ lt_model2 <- lm(TARGET_WINS ~ TEAM_BATTING_TOT_BASES + TEAM_BATTING_XTRA_BASE + 
 lt_model3 <- lm(TARGET_WINS ~ TEAM_BATTING_TOT_BASES + TEAM_BATTING_XTRA_BASE + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_HR + log(TEAM_FIELDING_E) + TEAM_FIELDING_DP, df_new)
 ```  
 
+Third model description and methodology.
+
+Many of the more advanced baseball statistics are simply combinations of other statistics (i.e. slugging percentage is total bases divided by at-bats). Using the predictors given in the data set, we wanted to see if combining predictors and/or calculating new values would increase any significance in a model that is trying to predict wins. Total bases and extra bases are both stats that can easily be calculated with the given data. Assuming that the number of doubles, triples and home runs are included in the `TEAM_BATTING_H` variable, we can subtract these out to obtain the number of singles. Adding this to the doubles, triples, and homeruns, each multiplied by the number of bases each is worth (2,3, and 4 respectively) would give total bases. Doing the same thing, but excluding single base hits would give the number of extra bases as well.  These two statistics were used in the model, along with many of the other predictors.
+Using a step-wise methodology, less significant predictors such as caught stealing, pitching walks & hits were left out.  To avoid including predictors that were related, the base hits/singles and other multiple base hit predictors were left out. Since the fielding errors predictor was drastically right-skewed, a log transformation was done on this predictor, resulting in a better fit of the model.
+Most of the predictors have coefficients that behave the way we would expect, given the predictors effect on the game. The extra bases predictor ended up having a negative coefficient, when we would expect there to be a positive one. This may be due to the fact that it is similar stats that make up these predictors, and there is collinearity between the total bases and extra bases predictors.  Removing extra bases from the model results in a lower coefficient for total bases, and an overall lower adjusted $R^2$ value for the model. 
+
 ```{r}
 # example of boxcox transformation (not appropriate for predictors with lots of outliers)
 
