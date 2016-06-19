@@ -1,0 +1,71 @@
+---
+title: "DATA621_HW1_LoganT"
+author: "Logan Thomson"
+date: "June 18, 2016"
+output: html_document
+---
+
+```{r}
+# Load packages
+library("ggplot2")
+library("reshape2")
+library("MASS")
+```
+
+```{r}
+# Load data
+dfraw <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-training-data.csv"))
+
+data_no_index <- dfraw[ ,c(2:17)] #Remove INDEX column
+
+for (i in 1:16) { # Impute median for missing values
+  data_no_index[,i][is.na(data_no_index[,i])] <-  median(data_no_index[,i], na.rm = TRUE)
+}
+df_new <- data_no_index
+summary(df_new)
+```
+
+```{r}
+# calculated columns for new predictors
+
+# Get Singles from Base Hits
+df_new$TEAM_BATTING_1B <- with(df_new, TEAM_BATTING_H - TEAM_BATTING_2B - TEAM_BATTING_3B - TEAM_BATTING_HR)
+
+# Create Extra Bases and Total Bases predictors
+df_new$TEAM_BATTING_XTRA_BASE <- with(df_new, TEAM_BATTING_2B + TEAM_BATTING_3B + TEAM_BATTING_HR)
+
+df_new$TEAM_BATTING_TOT_BASES <- with(df_new, TEAM_BATTING_1B + (2*TEAM_BATTING_2B) + (3*TEAM_BATTING_3B) + (4*TEAM_BATTING_HR))
+```  
+
+For first section - Box plots to visualize each predictor. Note how right-skewed the variables for `TEAM_PITCHING_H`, `TEAM_PITCHING_BB`, `TEAM_PITCHING_SO`, and `TEAM_FIELDING_E` are.
+
+```{r}
+# Facet Grid of Box Plots
+
+m <- melt(df_new)
+p <- ggplot(m, aes(factor(variable), value)) 
+p + geom_boxplot() + facet_wrap(~variable, scale="free")
+```  
+
+##Models - Logan 
+
+```{r}
+
+# 1st model uses Total Bases and Extra bases rather than base hits (all base #s)
+lt_model1 <- lm(TARGET_WINS ~ TEAM_BATTING_TOT_BASES + TEAM_BATTING_XTRA_BASE + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_BASERUN_CS + TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_FIELDING_E + TEAM_FIELDING_DP, df_new) 
+
+# 2nd model uses log transformations on skewed pitching data
+lt_model2 <- lm(TARGET_WINS ~ TEAM_BATTING_TOT_BASES + TEAM_BATTING_XTRA_BASE + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_BASERUN_CS + log1p(TEAM_PITCHING_H) + TEAM_PITCHING_HR + log1p(TEAM_PITCHING_BB) + log(TEAM_FIELDING_E) + TEAM_FIELDING_DP, df_new)
+
+# 3rd model similar to second, removed less significant predictors
+lt_model3 <- lm(TARGET_WINS ~ TEAM_BATTING_TOT_BASES + TEAM_BATTING_XTRA_BASE + TEAM_BATTING_BB + TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_PITCHING_HR + log(TEAM_FIELDING_E) + TEAM_FIELDING_DP, df_new)
+```  
+
+```{r}
+# example of boxcox transformation (not appropriate for predictors with lots of outliers)
+
+boxcox((TARGET_WINS + 1) ~ TEAM_FIELDING_E, data=df_new, lambda = seq(1.2, 1.5, length=10)) #MASS package
+
+summary(lm(TARGET_WINS ~ TEAM_FIELDING_E, df_new))
+summary(lm(TARGET_WINS ~ I(TEAM_FIELDING_E^1.35), df_new)) #results in higher adj. R-squared
+```
