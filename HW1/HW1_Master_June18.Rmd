@@ -235,8 +235,8 @@ Three predictors were removed:
 Predictors removed, due to high NA count: TEAM_BATTING_HBP and TEAM_BASERUN_CS
 Predictor removed, due to lack of relevance: TEAM_FIELDING_DP
 
-Bounds for predictors were set by MLB records from 1880 to today, with URL references shown in the code. Where our records were outside the bounds of these external records, they were replaced with NA values.
-Predictors removed sequentially removed, in order of significance; multiple predictors were created and tested, in the hopes of improving fit statistics, and one proved useful - the number of 1st base hits. This predictor was then added to the model.
+Bounds for predictors were set by minimum and maximum all-time MLB records, with citations shown in the code. Where our records were outside the bounds of these external records, they were replaced with NA values.
+Predictors were removed sequentially removed, in order of significance; multiple predictors were created and tested, in the hopes of improving fit statistics, and one proved useful - the number of 1st base hits. This predictor was then added to the model.
 ```{r}
 #Model 3 using 1880- Data
 install.packages("leaps")
