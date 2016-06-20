@@ -82,4 +82,14 @@ sensitivity(raw)
 specificity(raw)
 F1(raw)
 
+install.packages("caret")
+require(caret)
+confusionMatrix(raw$scored.class, raw$class)
+#Function mixes up specificity and sensitivity???
+
+install.packages("pROC")
+require(pROC)
+#roc(raw$class, raw$scored.class, auc = TRUE, plot = TRUE)
+#function call of roc doesn't work
+
 ```
