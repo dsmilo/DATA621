@@ -89,7 +89,6 @@ confusionMatrix(raw$scored.class, raw$class)
 
 install.packages("pROC")
 require(pROC)
-#roc(raw$class, raw$scored.class, auc = TRUE, plot = TRUE)
-#function call of roc doesn't work
+roc(factor(class) ~scored.probability, data = raw, auc = TRUE, plot = TRUE, smooth =  TRUE)
 
 ```
