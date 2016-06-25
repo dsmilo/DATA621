@@ -78,7 +78,6 @@ The precision of the predictions is: `r precision_function(df,predicted)`
 ###6. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the sensitivity of the predictions. Sensitivity is also known as recall.
 
 ```{r, echo = FALSE}
-
 sensitivity_function <- function(df, predicted){
   confusion <- table(select(df, class, get(predicted)))
   if(dim(confusion)[2] == 1){
@@ -191,6 +190,7 @@ The caret package seems to match well with our results.
 ###13. Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results compare with your own functions?
 
 ```{r, echo = FALSE}
+
 roc_curve <- roc(class ~ scored.probability, data = df)
 
 plot(y = roc_curve$sensitivities, x = 1 - roc_curve$specificities, col="blue", main="ROC curve", type = "l", ylab = "Sensitivity", xlab = "1 - Specificity")
@@ -204,6 +204,7 @@ The pROC package seems to match well with our results -- the area under the curv
 
 ##Appendix A -- R Code
 ```{r, eval = FALSE, echo = TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+#1. Load data
 library(dplyr)
 library(pander)
 library(ggplot2)
@@ -213,28 +214,33 @@ library(pROC)
 options(digits = 3)
 df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW2/Data/classification-output-data.csv"))
 
+#2. Build confusion matrix 
 confusion_matrix = table(select(df, class, scored.class))
 predicted = "scored.class"
 pander(confusion_matrix)
 
+#3. Accuracy function
 accuracy_function <- function(df, scored.class) {
   confusion <- table(select(df, class, scored.class))
   accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
   return(accuracy)
 }
 
+#4. Classification error rate function
 CER_function <- function(df, predicted){
   confusion <- table(select(df, class, get(predicted)))
   classification_error_rate <- (confusion[1,2] + confusion[2,1])/sum(confusion)
   return(classification_error_rate)
 }
 
+#5. Precision function
 precision_function <- function(df, predicted){
   confusion <- table(select(df, class, get(predicted)))
   precision <- confusion[2,2]/(confusion[1,2] + confusion[2,2])
   return(precision)
 }
 
+#6. Sensitivity function
 sensitivity_function <- function(df, predicted){
   confusion <- table(select(df, class, get(predicted)))
   if(dim(confusion)[2] == 1){
@@ -250,6 +256,7 @@ sensitivity_function <- function(df, predicted){
   return(sensitivity)
 }
 
+#7. Specificity function
 specificity_function <- function(df,predicted){
   confusion <- table(select(df, class, get(predicted)))  
   if(dim(confusion)[2] == 1){
@@ -264,6 +271,7 @@ specificity_function <- function(df,predicted){
   return(specificity)
 }
 
+#8. F1score function
 f1score_function <- function(df, predicted){
   precision <- precision_function(df, predicted)
   sensitivity <- sensitivity_function(df, predicted)
@@ -271,6 +279,7 @@ f1score_function <- function(df, predicted){
   return(f1score)
 }
 
+#10. ROC function
 roc_function <- function(df){
 
   sensitivity_list <- c()
@@ -298,15 +307,16 @@ roc_function <- function(df){
 
 }
 
-
 roc.results <- roc_function(df)
 results1 = roc.results[[1]]
 
 ggplot(results1, aes(x = 1 - specificity, y=sensitivity)) + geom_line() + ggtitle("ROC Curve")
 
+#12. Using Caret package
 caret_confusion = confusionMatrix(df$scored.class, df$class, positive = "1")
 pander(caret_confusion$table)
 
+#13. ROC curve
 roc_curve <- roc(class ~ scored.probability, data = df)
 
 plot(y = roc_curve$sensitivities, x = 1 - roc_curve$specificities, col="blue", main="ROC curve", type = "l", ylab = "Sensitivity", xlab = "1 - Specificity")
