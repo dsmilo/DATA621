@@ -61,7 +61,7 @@ CER_function <- function(df, predicted){
 The classification error rate is: `r CER_function(df, predicted)`
 
 
-Verify by summing the rates:
+Verify by summing the rates:                   
 The sum of the accuracy and error rate is: `r accuracy_function(df,predicted) +  CER_function(df,predicted)`
 
 
@@ -135,12 +135,12 @@ The F1 score is: `r f1score_function(df, predicted)`
 
 ###9. Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. 
 
-The variables used by the F1 score are Precision and Sensitivity. Precision is defined as True Positives divided by All Actual Positives. Precision will have a lower bound of 0 if True Positives is 0, and an upper bound at 1 if True Positives is equal to All Actual Positives. Sensitivity is defined as True Positives divided by All Predicted Positives. Sensitivity will have a lower bound of 0 if True positives is 0, and an upper bound at 1 if True Positives is equal to All Predicted Positives. If either Precision or Sensitivity is 0, this will give the F1 score a numerator of 0. If both Precision *and* Sensitivity is 0, the F1 Score will be invalid as it will have a denominator of 0. If both Precision *and* Sensitivity is 1, the numerator and denominator of the F1 score is equal to 2, giving an F1 Score of 1. In this way, the F1 score is bounded by the upper and lower limits of Precision and Sensitivity. 
+The variables used by the F1 score are Precision and Sensitivity. Precision is defined as True Positives divided by All Actual Positives. Precision will have a lower bound of 0 if True Positives is 0, and an upper bound at 1 if True Positives is equal to All Actual Positives. Sensitivity is defined as True Positives divided by All Predicted Positives. Sensitivity will have a lower bound of 0 if True positives is 0, and an upper bound at 1 if True Positives is equal to All Predicted Positives. If either Precision or Sensitivity is 0, this will give the F1 score a numerator of 0. If both Precision *and* Sensitivity is 0, the F1 Score will be invalid as it will have a denominator of 0. If both Precision *and* Sensitivity is 1, the numerator and denominator of the F1 score is equal to 2, giving an F1 Score of 1. In this way, the F1 score is bounded by the upper and lower limits of Precision and Sensitivity and the F1 score will always fall between 0 and 1. 
 
 ###10. Write a function that generates an ROC curve from a data set with a true classification column (class in our example) and a probability column (scored.probability in our example). Your function should return a list that includes the plot of the ROC curve and a vector that contains the calculated area under the curve (AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals.
 
 
-```{r, echo = FALSE, warning = FALSE, message = FALSE}
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.height = 2}
 roc_function <- function(df){
 
   sensitivity_list <- c()
@@ -201,7 +201,7 @@ plot(y = roc_curve$sensitivities, x = 1 - roc_curve$specificities, col="blue", m
 area_roc = sum(roc_curve$sensitivities*(1/length(roc_curve$sensitivities)))
 ```
 
-The pROC package seems to match well with our results -- the area under the curve for the pROC::roc function is `r area_roc`, while our value for the area under the curve is `r roc.results[[2]]`. We believe that this difference falls within natural variance given the difference in the two methods. 
+The pROC package seems to match well with our results -- the area under the curve for the pROC::roc function is `r area_roc`, while our value for the area under the curve is `r roc.results[[2]]`. We believe that this difference of 1% falls within natural variance given the difference in the two methods. 
 
 \newpage
 
