@@ -1,0 +1,49 @@
+
+
+#Full Basic Linear Regression, And Best Subsets Model with 4 predictors; The number of predictors (i.e. 4) is selected using BIC as a criterion
+#The minimum BIC occurs when 4 predictors are used, which are nox+age+rad+medv.
+```{r}
+#Import the original dataset, into train and test portions
+train <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-training-data.csv"))
+test <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-evaluation-data.csv"))
+
+#Check for normality of predictors
+par(mfrow = c(4, 4), mar=c(2,2,2,2))
+hist(train$zn); hist(train$indus);hist(train$chas);hist(train$nox);
+hist(train$rm);hist(train$age); hist(train$dis); hist(train$rad);
+hist(train$tax); hist(train$ptratio); hist(train$black); hist(train$lstat);
+hist(train$medv);
+
+## Part 1: Fit a Least Squares Regression Model using all thirteen predictors
+#fix(data.train)                           # View the TRAINING data set
+lm.fit <- lm(target ~ ., data = train)    # Fit the model using the TRAINING data set
+summary(lm.fit)                           # Summary of the linear regression model
+coef(lm.fit)                              # Extract the estimated regression model coefficients
+confint(lm.fit)                           # Obtain a 95% CI for the coefficient estimates
+par(mfrow = c(2, 2)); plot(lm.fit)        # Plot the model diagnostics
+vif(lm.fit); round(cor(train),2)          # Check for collinearity (VIF > 10; none)
+
+## Part 2: Apply Best Subset Selection using BIC to select the number of predictors and then
+# fit a least squares regression model using the "best" subset of predictor variables
+regfit.full <- regsubsets(target ~ ., data = train, nvmax = ncol(train)-1)
+summary(regfit.full)
+par(mfrow = c(1, 2))
+plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
+reg.summary <- summary(regfit.full)
+reg.summary$bic
+plot(reg.summary$bic, xlab = "Number of Predictors", ylab = "BIC", type = "l",
+     main = "Best Subset Selection Using BIC")
+minbic <- which.min(reg.summary$bic)
+points(minbic, reg.summary$bic[minbic], col = "brown", cex = 2, pch = 20)
+coef(regfit.full, minbic)
+lmminbic <- lm(target ~ nox+age+rad+medv, data = train) #Regression of the four best predictors, from best subsets results
+summary(lmminbic)                           # Summary of the linear regression model
+coef(lmminbic)                              # Extract the estimated regression model coefficients
+confint(lmminbic)                           # Obtain a 95% CI for the coefficient estimates
+par(mfrow = c(2, 2)); plot(lmminbic)        # Plot the model diagnostics
+vif(lmminbic);                              # Check for collinearity (all VIF <= 10)
+predict(lmminbic, train)
+predict(lmminbic, test)                          # Predict the responses for the TEST data set
+predict(lmminbic, test, interval = "prediction") # Prediction Interval of Predicted Responses
+predict(lmminbic, test, interval = "confidence") # Confidence Interval of Predicted Responses
+```
