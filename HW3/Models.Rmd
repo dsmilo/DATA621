@@ -1,7 +1,23 @@
 
 
 #####Full Basic Linear Regression, And Best Subsets Model with 4 predictors
-The number of predictors (i.e. 4) for the best subsets regression is selected using BIC as a criterion. The minimum BIC occurs when 4 predictors are used, which are nox+age+rad+medv.
+The number of predictors (i.e. 4) for the best subsets regression is selected using BIC as a criterion. The minimum BIC occurs when 4 predictors are used, which are nox, age, rad, medv.
+
+#####Full linear regression summary:
+
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.312 on 452 degrees of freedom
+Multiple R-squared:  0.622,	Adjusted R-squared:  0.612 
+F-statistic: 57.3 on 13 and 452 DF,  p-value: <2e-16
+
+#####Best Subsets Regression Summary (4 predictors: nox, age, rad, medv)
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.312 on 461 degrees of freedom
+Multiple R-squared:  0.616,	Adjusted R-squared:  0.612 
+F-statistic:  185 on 4 and 461 DF,  p-value: <2e-16
+
 ```{r}
 #Import the original dataset, into train and test portions
 train <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-training-data.csv"))
