@@ -170,7 +170,7 @@ roc_function <- function(df){
 
 roc.results <- roc_function(df)
 
-head(roc.results)
+tail(roc.results)
 
 ggplot(roc.results, aes(x=1-specificity, y=sensitivity)) + geom_line() + ggtitle("ROC Curve")
 
