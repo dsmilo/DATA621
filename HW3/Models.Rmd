@@ -16,6 +16,11 @@ Multiple R-squared:  0.616,	Adjusted R-squared:  0.612
 F-statistic:  185 on 4 and 461 DF,  p-value: <2e-16
 
 ```{r}
+library(lars)
+library(car)
+library(leaps)
+library(glmnet)
+
 #Import the original dataset, into train and test portions
 train <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-training-data.csv"))
 test <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-evaluation-data.csv"))
