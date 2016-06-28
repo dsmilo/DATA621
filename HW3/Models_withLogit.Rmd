@@ -35,7 +35,7 @@ hist(train$medv);
 
 ## Part 1: Fit a Least Squares Regression Model using all thirteen predictors
 #fix(data.train)                           # View the TRAINING data set
-lm.fit <- lm(target ~ ., data = train)    # Fit the model using the TRAINING data set
+lm.fit <- glm(target ~., data = train, family = binomial(link='logit'))    # Fit the model using the TRAINING data set
 summary(lm.fit)                           # Summary of the linear regression model
 coef(lm.fit)                              # Extract the estimated regression model coefficients
 confint(lm.fit)                           # Obtain a 95% CI for the coefficient estimates
