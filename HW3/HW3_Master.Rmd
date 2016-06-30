@@ -1,8 +1,8 @@
 ---
-title: "Homework #1: Baseball Analysis"
+title: "Homework #3: Crime Prediction"
 subtitle: "Data 621 Business Analytics and Data Mining"
 author: "Aadi Kalloo, Nathan Lim, Asher Meyers, Daniel Smilowitz, Logan Thomson"
-date: "Due June 19, 2016"
+date: "Due July 3, 2016"
 output: 
   pdf_document: 
     toc: true
@@ -10,7 +10,7 @@ output:
 geometry: margin=0.5in
 ---
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
 library(knitr)
 opts_chunk$set(warning=FALSE, message=FALSE, comment=NA, fig.align='center')
 
