@@ -190,6 +190,20 @@ names(all.cv.error) = c("Model", "Mean CV Error")
 
 
 ```
+#### Model 5
+
+Like Model 1, this is formed using best subsets regression with BIC as a criterion for choosing the number of predictors; however, with this model, predictors are removed sequentially until all predictors are statistically significant (p < 0.05). This leads to the removal of age and median home values as predictors.
+```{r, echo = FALSE, fig.height=2}
+model5 <- glm(target ~ nox+rad, data = train, family = binomial(link='logit'))
+summary(lmminbic)                           # Summary of the linear regression model
+
+train_df$predicted_model5 <- predict(model5, train_df, type = 'response')
+train_df$target_model5 <- ifelse(train_df$predicted_model5>0.5, 1, 0)
+roc_model5 <- pROC::roc(factor(target) ~ predicted_model5, data=train_df)
+
+plot(roc_model5, col="red")
+confusionMatrix(train_df$target, train_df$target_model5, positive = "1")
+```
 
 #####Mean CV Error
 ```{r, echo = FALSE}
