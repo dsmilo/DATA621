@@ -3,7 +3,7 @@ library(dplyr)
 library(pROC)
 library(leaps)
 library(caret)
-
+library(bestglm)
 
 train_df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-training-data.csv"))
 test_df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-evaluation-data.csv"))
@@ -99,3 +99,21 @@ plot(roc_model4, col="red")
 confusionMatrix(train_df$target, train_df$target_model4, positive = "1")
 
 #AUC is 0.961,  Accuracy : 0.8648
+
+
+
+
+bestglm_bic<- bestglm(train_df, IC= "BIC", family = binomial)
+bestglm_bic
+
+bestglm_model <- glm(target ~ nox +  rad + tax, family=binomial, data = train_df)
+summary(bestglm_model)
+train_df$predicted_bestglm <- predict(bestglm_model, train_df, type='response')
+train_df$target_bestglm <- ifelse(train_df$predicted_bestglm>0.5, 1, 0)
+roc_bestglm <- roc(factor(target) ~ predicted_bestglm, data=train_df)
+
+plot(roc_bestglm, col="red")
+confusionMatrix(train_df$target, train_df$target_bestglm, positive = "1")
+
+
+
