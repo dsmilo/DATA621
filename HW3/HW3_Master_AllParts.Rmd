@@ -394,7 +394,7 @@ The characteristics and performance of the seven models from the previous sectio
 |7|13|0.9753|0.9249|
 
 
-The model using only the significant predictors as determined by BIC (Model 4) was selected as the best model for prediction of `TARGET` in the crime data set.  While the AUC value of this model was not the highest of the models tested, its mean cross-validation error indicates that it is has the best predictive value for unseen data.  Additionally, it is a parsimonious model, and the simplicity lends itself to easier understanding of the model by other users.
+The model using only the significant predictors as determined by BIC (Model 3) was selected as the best model for prediction of `TARGET` in the crime data set.  While the AUC value of this model was not the highest of the models tested, its mean cross-validation error indicates that it is has the best predictive value for unseen data.  Additionally, it is a parsimonious model, and the simplicity lends itself to easier understanding of the model by other users.
 
 
 ##10-fold Cross Validation
