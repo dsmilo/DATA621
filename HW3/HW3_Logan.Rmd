@@ -1,0 +1,138 @@
+---
+title: "HW_3"
+author: "Logan Thomson"
+date: "June 27, 2016"
+output: html_document
+---
+
+```{r}
+library("ggplot2")
+library("reshape2")
+library("dplyr")
+library("e1071")
+```
+
+##Part 1: DATA EXPLORATION  
+
+```{r}
+# Load training data
+
+train_df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-training-data.csv"))
+```  
+
+The supplied data set contains various pieces of information about neighborhoods in a major U.S. city. The data set is made up of 466 rows, with 14 variables; 13 predictors and 1 response variable (`target`), which is a binary categorical variable.  A summary of each variable is below:  
+
+```{r}
+# Summary Table
+
+means <- sapply(train_df, mean)
+medians <- sapply(train_df, median)
+IQRs <- sapply(train_df, IQR)
+skews <- sapply(train_df, skewness)
+cors <- as.vector(cor(train_df$target, train_df[,1:ncol(train_df)]))
+
+header <- (c("MEAN", "MEDIAN", "IQR", "SKEWNESS", "CORRELATION TO TARGET"))
+
+datasummary <- as.data.frame(cbind(means, medians, IQRs, skews, cors))
+datasummary <- round(datasummary, 2)
+colnames(datasummary) <- header
+```  
+
+None of our predictors have missing values, so there will be no need to impute any variables. However, some of the predictors have a good amount of skew to the distribution of cases, and may need to be transformed to find a best fit model. 
+
+```{r box_plots}
+#Boxpots with ggplot2
+
+m <- melt(train_df, variable.name="Predictor")
+p <- ggplot(m, aes(Predictor, value)) 
+p <- p + geom_boxplot(aes(fill = Predictor), show.legend = FALSE) + facet_wrap(~Predictor, scale="free")
+p
+```  
+
+Looking at the box plots above, we can see that the `zn` and `black` predictors are strongly skewed. `chas`, indicating if a suburb borders the Charles River, is also strongly skewed, but like our response variable, it is a two-level categorical predictor and the skew shows because 92% of the values are 0.
+
+```{r}
+par(mfrow=c(3,1))
+hist(train_df$zn, breaks=5, col="slategrey", main="Hist. of 'zn' Predictor")
+hist(train_df$black, breaks=5, col="slategrey", main="Hist. of 'black' Predictor")
+hist(train_df$chas, col="slategrey", main="Hist. of 'chas' Predictor")
+```  
+
+Since our response variable `target` is a two-level factor, we can take a look at a plot of each predictor, subset by `target` and see the relationship between the predictor and our response variable. Right away, the difference in means for some of the variables is quite apparent. These variables also have a higher corrleation to `target`, and may be some of the more significant predictors in our models.  
+
+```{r boxplot_by_target}
+
+# Boxplot of predictors split by Target value (0 or 1)
+n <- melt(train_df, id.vars="target", variable.name = "Predictor")
+q <- ggplot(n, aes(Predictor, value)) 
+q <- q + geom_boxplot(aes(fill = factor(target), show.legend = FALSE)) + facet_wrap(~Predictor, scale="free")
+q
+```  
+
+The predictors with the highest correlation to `target` are `indus`, `nox`, `age`, `dis`, `rad`, and `tax`, and all are related to each other in some form when we consider industrial zoning and the effects it has on a surrounding area. In fact, looking at these variables against each other, we see that they are highly correlated as well, evidence that multicollinearity exists.  
+
+```{r predictor_pairs}
+pairs(~indus+nox+age+dis+rad+tax, data=train_df, main="Highly Correlated Predictors", col="slategrey")
+```  
+
+Scatterplots are shown below for those variables with higher correlations and larger differences in means when subset by the `target` response variable. Plots for all predictors against the `target` variable are included in the appendix.  
+
+```{r plots_highest_cor}
+#scatterplot of highly correlated predictors against Target
+
+par(mfrow=c(3,2))
+for (i in c(2,4,6:9)){
+  plot(train_df[ ,i], train_df$target, main = paste(names(train_df[i]), "vs. Target"), xlab = names(train_df)[i], ylab = "Target")
+}
+```
+
+Some of the values in each predictor are leverage points, and due to the outliers in each variable, may be bad leverage points (standard residuals with abs. value > 2) depending on what predictors are used in our models. Transformations on the predictors with higher skewness may elminate these leverage points as well.  
+
+```{r}
+# Scatterplots of predictors against response for appendix
+
+par(mfrow=c(4,3))
+for (i in c(1,2,4:13)){
+  plot(train_df[ ,i], train_df$target, main = paste(names(train_df[i]), "vs. Target"), xlab = names(train_df)[i], ylab = "Target")
+}
+
+# `chas` plotted separately since it is a two-level factor
+
+par(mfrow=c(1,1))
+plot(jitter(train_df$chas), jitter(train_df$target, amount=.005), main="Charles River vs.Target", xlab="chas", ylab="target") # jitter applied to prevent points in corners
+```  
+
+## Part 2: DATA PREPARATION  
+
+As stated in Part 1, there are no missing values in the training data set, so we do not need to impute any of the variables, or exclude any cases in the data set.  The predictor `black`, which measures the proportion of blacks by town appears to already have been transformed (adding a constant value, squaring, then multiplying by 1000). Undoing this transformation simply results in data that is even more skewed against the response variable, so the transformation was done to reduce this.  
+
+Combining other predictors or using ratios did not seem to create any new meaningful predictors that would improve our models, however due to the left- and right-skewness of some of our predictors, transformations like log, square root, or 1/X reduce the amount of skew and increase the correlation of our predictors to the response.  
+
+In the table below, we can see the effect of each of the transformations on the correlation to the `target` variable. Many of the transformations do not help in improving the correlation, but the log transformation of `nox` and `rad` may fit our models better, as well as the square root of `indus`.
+
+```{r}
+# Transformation Table
+
+cors2 <- as.vector(cor(train_df$target, train_df[,1:ncol(train_df)]))
+log_cors <- as.vector(cor(train_df$target, log(train_df[,1:ncol(train_df)])))
+sqrt_cors <- as.vector(cor(train_df$target, sqrt(train_df[,1:ncol(train_df)])))
+recip_cors <- as.vector(cor(train_df$target, (1/train_df[,1:ncol(train_df)])))
+
+header2 <- (c("No Transform", "LOG", "SQ.ROOT", "1/X"))
+
+transforms <- as.data.frame(cbind(cors2, log_cors, sqrt_cors, recip_cors))
+transforms <- round(transforms, 2)
+rownames(transforms) <- colnames(train_df)
+colnames(transforms) <- header2
+transforms # use kable?
+```  
+
+```{r}
+#Only for comparison
+
+summary(glm(target ~ nox, data=train_df, family=binomial))
+summary(glm(target ~ log(nox), data=train_df, family=binomial)) # results in lower AIC
+
+summary(glm(target ~ indus, data=train_df, family=binomial))
+summary(glm(target ~ I(indus^.5), data=train_df, family=binomial))
+```
