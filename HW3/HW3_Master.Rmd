@@ -5,14 +5,13 @@ author: "Aadi Kalloo, Nathan Lim, Asher Meyers, Daniel Smilowitz, Logan Thomson"
 date: "Due July 3, 2016"
 output: 
   pdf_document: 
-    toc: true
-
+    toc: yes
 geometry: margin=0.5in
 ---
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE}
+```{r setup, include=FALSE}
 library(knitr)
-opts_chunk$set(warning=FALSE, message=FALSE, comment=NA, fig.align='center')
+opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, comment=NA, fig.align='center')
 
 library(stringr)
 library(pander)
@@ -23,12 +22,14 @@ library(MASS)
 library(leaps)
 library(pROC)
 library(caret)
+library(bestglm)
 
 train_df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-training-data.csv"))
 test_df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-evaluation-data.csv"))
 
 train_df$target <- factor(train_df$target) # to factor
 
+mai = c(1, 0.1, 0.1, 0.1)
 # Stuff for Part 1 table/figure preparation
 
 ```
@@ -37,7 +38,7 @@ train_df$target <- factor(train_df$target) # to factor
 
 #Data Exploration
 
-```{r}
+```{r exploration, eval=FALSE}
 pairs(train_df, col= train_df$target)
 ```
 
@@ -47,67 +48,231 @@ pairs(train_df, col= train_df$target)
 
 #Model Creation
 
-####Model 1
-```{r, echo = FALSE, fig.height=2}
+##Model 1: Bayesian Information Criterion
+The first model created utilizes the Bayesian Information Criterion (BIC) to determine the number of predictors to use and which predictors should be used.
+
+```{r BIC, fig.height=3.5}
+regfit.full <- regsubsets(factor(target) ~ ., data=train_df)
+
+par(mfrow = c(1,2))
+
+reg.summary <- summary(regfit.full)
+plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Subset Selection Using BIC")
+BIC_num <- which.min(reg.summary$bic) 
+points(BIC_num, reg.summary$bic[BIC_num], col="red", cex=2, pch=20)
+
+plot(regfit.full, scale="bic", main="Predictors vs. BIC")
+par(mfrow = c(1,1))
+```
+The left plot above shows that the BIC is minimized using 4 predictors.  The plot on the right shows that the 4 predictors with the lowest BIC are `nox`, `age`, `rad`, and `medv`.  As such, a model is created using these predictors; this model is presented below.
+
+```{r model1-run}
 model1 <- glm(target ~ nox + age + rad + medv, family=binomial, data = train_df)
-summary(model1)
 
 train_df$predicted_model1 <- predict(model1, train_df, type='response')
 train_df$target_model1 <- ifelse(train_df$predicted_model1>0.5, 1, 0)
-roc_model1 <- pROC::roc(target ~ predicted_model1, data = train_df)
 
-plot(roc_model1, col="red")
-
-confusionMatrix(train_df$target, train_df$target_model1, positive = "1")
-# AUC is  0.957 Accuracy : 0.8691 
-
+pander(summary(model1))
 ```
 
+The coefficients in this model indicate that nitrogen oxides concentration has the strongest, as well as the most statistically significant, effect on on the target variable.  Age, highway access, and home value all have far weaker effects on the target.  All of the estimated coefficients are statistically significant at the $\alpha = 0.5$ level except `medv` -- the p-value for this coefficient is 0.0534.
 
-####Model 2
-```{r, echo = FALSE, fig.height=2}
+The receiver operating characteristic (ROC) curve and confusion matrix returned by this model are shown below:
+```{r model1-perf, fig.height=3, fig.width=4}
+roc_model1 <- roc(target ~ predicted_model1, data = train_df)
+
+plot_roc <- plot(roc_model1, col="red", main = "Model 1 ROC")
+
+pander(confusionMatrix(train_df$target, train_df$target_model1, positive = "1")$table)
+# AUC is  0.957 Accuracy : 0.8712 
+```
+
+This model provides an area under the curve of 0.9570 and an accuracy of 0.8691.
+
+
+##Model 2: Mallow's $C_p$
+The second model created utilizes Mallow's $C_p$ to determine the number of predictors to use and which predictors should be used.
+```{r Cp, fig.height=3.5}
+par(mfrow = c(1,2))
+
+plot(reg.summary$cp, xlab="Number of Predictors", ylab=expression("C"[p]), type="l", main=expression("Subset Selection using C"[p]))
+Cp_num <- which.min(reg.summary$cp)
+points(Cp_num, reg.summary$cp[Cp_num], col="red", cex=2, pch=20)
+
+plot(regfit.full, scale="Cp", main=expression("Predictors vs. C"[p]))
+par(mfrow = c(1,1))
+```
+The left plot above shows that $C_p$ is minimized using 5 predictors.  The plot on the right shows that the 5 predictors with the lowest $C_p$ are `nox`, `age`, `rad`, `ptratio`, and `medv`.  As such, a model is created using these predictors; this model is presented below.
+
+```{r model2-run}
 model2 <- glm(target ~ nox + age + rad + ptratio + medv, family=binomial, data = train_df)
-summary(model2)
 
 train_df$predicted_model2 <- predict(model2, train_df, type='response')
 train_df$target_model2 <- ifelse(train_df$predicted_model2>0.5, 1, 0)
 
-roc_model2 <- pROC::roc(factor(target) ~ predicted_model2, data=train_df)
+pander(summary(model2))
+```
 
-plot(roc_model2, col="red")
+As in model 1, the coefficients in this model indicate that nitrogen oxides concentration has the strongest, as well as the most statistically significant, effect on on the target variable.  This may be due to the fact that a single part per 10 million in concentration merits a unit increase in this variable.  Each of the estimated coefficients are statistically signficant.
 
-confusionMatrix(train_df$target, train_df$target_model2, positive = "1")
+The ROC curve and confusion matrix returned by this model are shown below:
+
+```{rmodel2-perf, fig.height=3, fig.width=4}
+roc_model2 <- roc(factor(target) ~ predicted_model2, data=train_df)
+
+plot_roc <- plot(roc_model2, col="red", main = "Model 2 ROC")
+
+pander(confusionMatrix(train_df$target, train_df$target_model2, positive = "1")$table)
 #AUC is 0.9605 Accuracy : 0.8691
 ```
 
-####Model 3
-```{r, echo = FALSE, fig.height=2}
+This model provides an area under the curve of 0.9605 and an accuracy of 0.8691.
+
+
+##Model 3: Transformed BIC
+Model 3 is created using the same BIC selection from Model 1, with modification from transformation.  Based on the distributions of the `nox` and `rad` variables, log transformations of these variables are used.  The model using these transformed variables, the model is presented below.
+```{r model3-run}
 model3 <- glm(target ~ log(nox) + age + log(rad) + medv, family=binomial, data = train_df)
-summary(model3)
 
 train_df$predicted_model3 <- predict(model3, train_df, type='response')
 train_df$target_model3 <- ifelse(train_df$predicted_model3>0.5, 1, 0)
-roc_model3 <- pROC::roc(factor(target) ~ predicted_model3, data=train_df)
 
-plot(roc_model3, col="red")
-confusionMatrix(train_df$target, train_df$target_model3, positive = "1")
+pander(summary(model3))
+```
+
+In model 3, the coefficient associated with nitrogen oxide concentration is once again the largest in magnitude, although it has decreased in magnitude.  The estimated coefficient for home value is now statistically signficant; however, the coefficient for age no longer is.
+
+The ROC curve and confusion matrix returned by this model are shown below:
+
+```{r model3-perf, fig.height=3, fig.width=4}
+roc_model3 <- roc(factor(target) ~ predicted_model3, data=train_df)
+
+plot_roc <- plot(roc_model3, col="red", main = "Model 3 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model3, positive = "1")$table)
 
 #AUC is 0.9584, Accuracy : 0.8691 
 ```
 
-#Model4
-```{r, echo = FALSE, fig.height=2}
-model4 <- glm(target ~ log(nox) +  log(rad) + tax, family=binomial, data = train_df)
-summary(model4)
-train_df$predicted_model4 <- predict(model4, train_df, type='response')
+This model has an area under the curve of 0.9584 and an accuracy of 0.8691.
+
+
+##Model 4: Significant BIC
+Like Model 1, this model is formed using best subsets regression with BIC as a criterion for choosing the number of predictors; however, with this model, predictors are removed sequentially until all predictors are statistically significant (p < 0.05). This leads to the removal of age and median home values as predictors.
+```{r model4-run}
+model4 <- glm(target ~ nox+rad, data = train_df, family = binomial(link='logit'))
+
+train_df$predicted_model4 <- predict(model4, train_df, type = 'response')
 train_df$target_model4 <- ifelse(train_df$predicted_model4>0.5, 1, 0)
-roc_model4 <- pROC::roc(factor(target) ~ predicted_model4, data=train_df)
 
-plot(roc_model4, col="red")
-confusionMatrix(train_df$target, train_df$target_model4, positive = "1")
-
-#AUC is 0.961,  Accuracy : 0.8648
+pander(summary(model4))
 ```
+
+The coefficients for this model are similar to the coefficients associated with the two variables in the larger BIC model (Model 1), but show far greater statistical significance with the additional variables removed.
+
+```{r model4-perf, fig.height=3, fig.width=4}
+roc_model4 <- roc(factor(target) ~ predicted_model4, data=train_df)
+
+plot_roc <- plot(roc_model4, col="red", main = "Model 4 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model4, positive = "1")$table)
+
+#AUC is 0.9575, Accuracy: 0.8691
+```
+
+This model has an area under the curve of 0.9575 and an accuracy of 0.8691.
+
+
+
+##Model 5: Best GLM
+The `bestglm` [package](https://cran.r-project.org/web/packages/bestglm/vignettes/bestglm.pdf) is implemented to "[select] the best subset of inputs for the GLM family."  The BIC is still used as the information criteria.  The model generated by the package is presented below.
+```{r model5-run}
+# bestglm_bic <- bestglm(train_df, IC= "BIC", family = binomial) #very slow - do not evaluate
+
+model5 <- glm(target ~ nox +  rad + tax, family=binomial, data = train_df)
+
+train_df$predicted_model5 <- predict(model5, train_df, type='response')
+train_df$predicted_model5 <- ifelse(train_df$predicted_model5>0.5, 1, 0)
+
+pander(summary(model5))
+```
+
+The coefficients for this model again indicate the strong influence of a unit increase in nitrogen oxide concentration.  The inclusion of property tax rate in the model lead to the first negative coefficient seen.  Each of the coefficient estimates is of very high statistical significance.
+
+```{r model5-perf, fig.height=3, fig.width=4}
+roc_model5 <- roc(factor(target) ~ predicted_model5, data=train_df)
+
+plot_roc <- plot(roc_model5, col="red", main = "Model 5 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model5, positive = "1")$table)
+
+#AUC is 0.8876,  Accuracy : 0.8691
+```
+
+This model has an area under the curve of 0.8876 and an accuracy of 0.8691.
+
+
+##Model 6: Transformed Best GLM
+Using the three variables identified by the `bestglm` function for Model 5, the `nox` and `rad` predictors are transformed using logarithms, as in Model 3.  The model using these transformations is presented below.
+```{r model6-run}
+model6 <- glm(target ~ log(nox) +  log(rad) + tax, family=binomial, data = train_df)
+
+train_df$predicted_model6 <- predict(model5, train_df, type='response')
+train_df$target_model6 <- ifelse(train_df$predicted_model6>0.5, 1, 0)
+
+pander(summary(model6))
+```
+
+The coefficient for nitrogen oxide concentration decreased following the transformation, as did the standard error of the estimate of the coefficient.  While the p-value related to the coefficients changed following the tranformation, all estimates remain statistically significant.
+
+```{r model6-perf, fig.height=3, fig.width=4}
+roc_model6 <- roc(factor(target) ~ predicted_model6, data=train_df)
+
+plot_roc <- plot(roc_model6, col="red", main = "Model 6 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model6, positive = "1")$table)
+
+#AUC is 0.9594,  Accuracy : 0.8884
+```
+
+This model has an area under the curve of 0.9594 and an accuracy of 0.8884.
+
+
+##Model 7: Full Model
+For completeness, a full generalized linear model is created using all explanatory variables.
+```{r model7-run}
+model7 <- glm(target ~ zn+indus+chas+nox+rm+age+dis+rad+tax+ptratio+black+lstat+medv, data = train_df, family = binomial(link='logit'))
+
+train_df$predicted_model7 <- predict(model7, train_df, type = 'response')
+train_df$target_model7 <- ifelse(train_df$predicted_model7 > 0.5, 1, 0)
+
+pander(summary(model7))
+```
+
+The 13 coefficients in the full model vary very widely in magnitude, and five of the coefficients are negative.  There is also a wide range of signifcances -- 5 of the coefficients are not significant under any reasonable $\alpha$, and one is very nearly exactly 0.05.
+
+```{r model7-perf, fig.height=3, fig.width=4}
+roc_model7 <- roc(factor(target) ~ predicted_model7, data=train_df)
+
+plot_roc <- plot(roc_model7, col="red", main = "Model 7 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model7, positive = "1")$table)
+
+#AUC 0.9753; Accuracy 0.9249
+```
+
+This model has an area under the curve of 0.9753 and an accuracy of 0.9249.
+
+
+
+
+##Model Comparison
+The characteristics and performance of the six models are compared below:
+
+|Model #|# of Predictors|AUC|Accuracy|
+|---|---|---|---|
+|1|4|0.9570|0.8712|
+|2|5|0.9605|0.8691|
+|3|4|0.9584|0.8691|
+|4|2|0.9575|0.8691|
+|5|3|0.8876|0.8691|
+|6|3|0.9594|0.8884|
+|7|13|0.9753|0.9249|
 
 
 #Model Selection and Prediction
@@ -190,39 +355,11 @@ names(all.cv.error) = c("Model", "Mean CV Error")
 
 
 ```
-#### Model 5
 
-Like Model 1, this is formed using best subsets regression with BIC as a criterion for choosing the number of predictors; however, with this model, predictors are removed sequentially until all predictors are statistically significant (p < 0.05). This leads to the removal of age and median home values as predictors.
-```{r, echo = FALSE, fig.height=2}
-model5 <- glm(target ~ nox+rad, data = train, family = binomial(link='logit'))
-summary(model5)                           # Summary of the linear regression model
-
-train_df$predicted_model5 <- predict(model5, train_df, type = 'response')
-train_df$target_model5 <- ifelse(train_df$predicted_model5>0.5, 1, 0)
-roc_model5 <- pROC::roc(factor(target) ~ predicted_model5, data=train_df)
-
-plot(roc_model5, col="red")
-confusionMatrix(train_df$target, train_df$target_model5, positive = "1")
-```
-
-#### Model 6: All predictors used
-
-Like Model 1, this is formed using best subsets regression with BIC as a criterion for choosing the number of predictors; however, with this model, predictors are removed sequentially until all predictors are statistically significant (p < 0.05). This leads to the removal of age and median home values as predictors.
-```{r, echo = FALSE, fig.height=2}
-model6 <- glm(target ~., data = train, family = binomial(link='logit'))
-summary(model6)                           # Summary of the linear regression model
-
-train_df$predicted_model6 <- predict(model6, train_df, type = 'response')
-train_df$target_model6 <- ifelse(train_df$predicted_model6 > 0.5, 1, 0)
-roc_model6 <- pROC::roc(factor(target) ~ predicted_model6, data=train_df)
-
-plot(roc_model6, col="red")
-confusionMatrix(train_df$target, train_df$target_model6, positive = "1")
-```
 
 
 #####Mean CV Error
-```{r, echo = FALSE}
+```{r cv-erro}
 pander(all.cv.error)
 ```
 
@@ -247,14 +384,14 @@ A comparison of the full sets of predictions for the evaluation dataset is avail
 \newpage 
 
 #Appendix A 
-```{r, echo = FALSE}
+```{r appendix-a}
 
 ```
 
 \newpage
 
 #Appendix B -- Index-wise Results from Predictive Model
-```{r, echo = FALSE}
+```{r appendix-b}
 # appendixB = data.frame(matrix(NA, nrow = 130, ncol = 4))
 # appendixB[, 1] = evaluation_data$INDEX[1:130]
 # appendixB[, 2] = predicted_wins[1:130] 
@@ -270,6 +407,6 @@ A comparison of the full sets of predictions for the evaluation dataset is avail
 
 #Appendix C -- R Code
 
-```{r, echo = TRUE, eval = FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r appendix-c, echo = TRUE, eval = FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
 ```
