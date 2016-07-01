@@ -57,6 +57,7 @@ header <- (c("MEAN", "MEDIAN", "IQR", "SKEWNESS", "CORRELATION TO TARGET"))
 datasummary <- as.data.frame(cbind(means, medians, IQRs, skews, cors))
 datasummary <- round(datasummary, 2)
 colnames(datasummary) <- header
+pander(datasummary)
 ```  
 
 None of our predictors have missing values, so there will be no need to impute any variables. However, some of the predictors have a good amount of skew to the distribution of cases, and may need to be transformed to find a best fit model. 
@@ -147,7 +148,7 @@ transforms <- as.data.frame(cbind(cors2, log_cors, sqrt_cors, recip_cors))
 transforms <- round(transforms, 2)
 rownames(transforms) <- colnames(train_df)
 colnames(transforms) <- header2
-pander(transforms) # use kable?
+pander(transforms)
 ```  
 
 ```{r, echo = FALSE, eval = FALSE}
