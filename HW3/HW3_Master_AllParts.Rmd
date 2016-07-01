@@ -39,11 +39,11 @@ mai = c(1, 0.1, 0.1, 0.1)
 ```
 
 
-
-## Data Exploration
+\newpage
+# Data Exploration
 The supplied data set contains various pieces of information about neighborhoods in a major U.S. city. The data set is made up of 466 rows, with 14 variables; 13 predictors and 1 response variable (`target`), which is a binary categorical variable.  A summary of each variable is below:  
 
-```{r, echo = FALSE}
+```{r summary}
 # Summary Table
 
 means <- sapply(train_df, mean)
@@ -61,33 +61,31 @@ colnames(datasummary) <- header
 
 None of our predictors have missing values, so there will be no need to impute any variables. However, some of the predictors have a good amount of skew to the distribution of cases, and may need to be transformed to find a best fit model. 
 
-```{r box_plots}
+```{r box_plots, fig.height=6}
 #Boxpots with ggplot2
 
 m <- melt(train_df, variable.name="Predictor")
-p <- ggplot(m, aes(Predictor, value)) 
-p <- p + geom_boxplot(aes(fill = Predictor), show.legend = FALSE) + facet_wrap(~Predictor, scale="free")
-p
+ggplot(m, aes(Predictor, value)) + geom_boxplot(aes(fill = Predictor), alpha = 0.75, show.legend = FALSE) + facet_wrap(~Predictor, scale="free") + scale_y_continuous('') + scale_x_discrete('', breaks = NULL) + ggtitle("Distribution of Predictor and Target Variables\n")
 ```  
 
 Looking at the box plots above, we can see that the `zn` and `black` predictors are strongly skewed. `chas`, indicating if a suburb borders the Charles River, is also strongly skewed, but like our response variable, it is a two-level categorical predictor and the skew shows because 92% of the values are 0.
 
-```{r, echo = FALSE}
+```{r hists, fig.height=6}
 par(mfrow=c(3,1))
 hist(train_df$zn, breaks=5, col="slategrey", main="Hist. of 'zn' Predictor")
 hist(train_df$black, breaks=5, col="slategrey", main="Hist. of 'black' Predictor")
 hist(train_df$chas, col="slategrey", main="Hist. of 'chas' Predictor")
+par(mfrow = c(1,1))
 ```  
 
 Since our response variable `target` is a two-level factor, we can take a look at a plot of each predictor, subset by `target` and see the relationship between the predictor and our response variable. Right away, the difference in means for some of the variables is quite apparent. These variables also have a higher corrleation to `target`, and may be some of the more significant predictors in our models.  
 
-```{r boxplot_by_target}
+```{r boxplot_by_target, fig.height=6}
 
 # Boxplot of predictors split by Target value (0 or 1)
 n <- melt(train_df, id.vars="target", variable.name = "Predictor")
-q <- ggplot(n, aes(Predictor, value)) 
-q <- q + geom_boxplot(aes(fill = factor(target), show.legend = FALSE)) + facet_wrap(~Predictor, scale="free")
-q
+n$target <- factor(n$target)
+ggplot(n, aes(target, value)) + geom_boxplot(aes(fill = target), alpha = 0.75) + facet_wrap(~Predictor, scale="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by Target\n")
 ```  
 
 The predictors with the highest correlation to `target` are `indus`, `nox`, `age`, `dis`, `rad`, and `tax`, and all are related to each other in some form when we consider industrial zoning and the effects it has on a surrounding area. In fact, looking at these variables against each other, we see that they are highly correlated as well, evidence that multicollinearity exists.  
@@ -98,13 +96,14 @@ pairs(~indus+nox+age+dis+rad+tax, data=train_df, main="Highly Correlated Predict
 
 Scatterplots are shown below for those variables with higher correlations and larger differences in means when subset by the `target` response variable. Plots for all predictors against the `target` variable are included in the appendix.  
 
-```{r plots_highest_cor}
+```{r plots_highest_cor, fig.height=6}
 #scatterplot of highly correlated predictors against Target
 
 par(mfrow=c(3,2))
 for (i in c(2,4,6:9)){
   plot(train_df[ ,i], train_df$target, main = paste(names(train_df[i]), "vs. Target"), xlab = names(train_df)[i], ylab = "Target")
 }
+par(mfrow=c(1,1))
 ```
 
 
@@ -124,7 +123,9 @@ par(mfrow=c(1,1))
 plot(jitter(train_df$chas), jitter(train_df$target, amount=.005), main="Charles River vs.Target", xlab="chas", ylab="target") # jitter applied to prevent points in corners
 ```  
 
-## Data Preparation
+\newpage
+
+# Data Preparation
 
 As stated in Part 1, there are no missing values in the training data set, so we do not need to impute any of the variables, or exclude any cases in the data set.  The predictor `black`, which measures the proportion of blacks by town appears to already have been transformed (adding a constant value, squaring, then multiplying by 1000). Undoing this transformation simply results in data that is even more skewed against the response variable, so the transformation was done to reduce this.  
 
@@ -159,6 +160,7 @@ summary(glm(target ~ indus, data=train_df, family=binomial))
 summary(glm(target ~ I(indus^.5), data=train_df, family=binomial))
 ```
 
+\pagebreak
 
 #Model Creation
 
@@ -374,11 +376,12 @@ pander(confusionMatrix(train_df$target, train_df$target_model7, positive = "1")$
 
 This model has an area under the curve of 0.9753 and an accuracy of 0.9249.
 
+\newpage
 
-
+#Model Selection and Prediction
 
 ##Model Comparison
-The characteristics and performance of the six models are compared below:
+The characteristics and performance of the seven models from the previous section are compared below:
 
 |Model #|# of Predictors|AUC|Accuracy|
 |---|---|---|---|
@@ -391,9 +394,7 @@ The characteristics and performance of the six models are compared below:
 |7|13|0.9753|0.9249|
 
 
-#Model Selection and Prediction
-
-The model selected used only the significant predictors (Model 3) was selected as the best model for prediction of `TARGET` in the crime data set.  While the AUC value of this model the second-highest of the four models tested, its mean cross-validation error indicates that it is has the best predictive value for unseen data.  Additionally, it is a parsimonious model, and the simplicity lends itself to easier understanding of the model by other users.
+The model using only the significant predictors as determined by BIC (Model 4) was selected as the best model for prediction of `TARGET` in the crime data set.  While the AUC value of this model was not the highest of the models tested, its mean cross-validation error indicates that it is has the best predictive value for unseen data.  Additionally, it is a parsimonious model, and the simplicity lends itself to easier understanding of the model by other users.
 
 
 ##10-fold Cross Validation
