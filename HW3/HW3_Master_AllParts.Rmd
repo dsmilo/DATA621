@@ -1,0 +1,562 @@
+---
+title: "Homework #3: Crime Prediction"
+subtitle: "Data 621 Business Analytics and Data Mining"
+author: "Aadi Kalloo, Nathan Lim, Asher Meyers, Daniel Smilowitz, Logan Thomson"
+date: "Due July 3, 2016"
+output: 
+  pdf_document: 
+    toc: yes
+geometry: margin=0.5in
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, comment=NA, fig.align='center')
+knitr::opts_chunk$set(error = TRUE)
+
+library(stringr)
+library(pander)
+library(ggplot2)
+library(gridExtra)
+library(reshape2)
+library(MASS)
+library(leaps)
+library(pROC)
+library(caret)
+library(bestglm)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(e1071)
+
+train_df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-training-data.csv"))
+test_df <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW3/Data/crime-evaluation-data.csv"))
+
+
+mai = c(1, 0.1, 0.1, 0.1)
+# Stuff for Part 1 table/figure preparation
+
+```
+
+
+
+## Data Exploration
+The supplied data set contains various pieces of information about neighborhoods in a major U.S. city. The data set is made up of 466 rows, with 14 variables; 13 predictors and 1 response variable (`target`), which is a binary categorical variable.  A summary of each variable is below:  
+
+```{r, echo = FALSE}
+# Summary Table
+
+means <- sapply(train_df, mean)
+medians <- sapply(train_df, median)
+IQRs <- sapply(train_df, IQR)
+skews <- sapply(train_df, skewness)
+cors <- as.vector(cor(train_df$target, train_df[,1:ncol(train_df)]))
+
+header <- (c("MEAN", "MEDIAN", "IQR", "SKEWNESS", "CORRELATION TO TARGET"))
+
+datasummary <- as.data.frame(cbind(means, medians, IQRs, skews, cors))
+datasummary <- round(datasummary, 2)
+colnames(datasummary) <- header
+```  
+
+None of our predictors have missing values, so there will be no need to impute any variables. However, some of the predictors have a good amount of skew to the distribution of cases, and may need to be transformed to find a best fit model. 
+
+```{r box_plots}
+#Boxpots with ggplot2
+
+m <- melt(train_df, variable.name="Predictor")
+p <- ggplot(m, aes(Predictor, value)) 
+p <- p + geom_boxplot(aes(fill = Predictor), show.legend = FALSE) + facet_wrap(~Predictor, scale="free")
+p
+```  
+
+Looking at the box plots above, we can see that the `zn` and `black` predictors are strongly skewed. `chas`, indicating if a suburb borders the Charles River, is also strongly skewed, but like our response variable, it is a two-level categorical predictor and the skew shows because 92% of the values are 0.
+
+```{r, echo = FALSE}
+par(mfrow=c(3,1))
+hist(train_df$zn, breaks=5, col="slategrey", main="Hist. of 'zn' Predictor")
+hist(train_df$black, breaks=5, col="slategrey", main="Hist. of 'black' Predictor")
+hist(train_df$chas, col="slategrey", main="Hist. of 'chas' Predictor")
+```  
+
+Since our response variable `target` is a two-level factor, we can take a look at a plot of each predictor, subset by `target` and see the relationship between the predictor and our response variable. Right away, the difference in means for some of the variables is quite apparent. These variables also have a higher corrleation to `target`, and may be some of the more significant predictors in our models.  
+
+```{r boxplot_by_target}
+
+# Boxplot of predictors split by Target value (0 or 1)
+n <- melt(train_df, id.vars="target", variable.name = "Predictor")
+q <- ggplot(n, aes(Predictor, value)) 
+q <- q + geom_boxplot(aes(fill = factor(target), show.legend = FALSE)) + facet_wrap(~Predictor, scale="free")
+q
+```  
+
+The predictors with the highest correlation to `target` are `indus`, `nox`, `age`, `dis`, `rad`, and `tax`, and all are related to each other in some form when we consider industrial zoning and the effects it has on a surrounding area. In fact, looking at these variables against each other, we see that they are highly correlated as well, evidence that multicollinearity exists.  
+
+```{r predictor_pairs}
+pairs(~indus+nox+age+dis+rad+tax, data=train_df, main="Highly Correlated Predictors", col="slategrey")
+```  
+
+Scatterplots are shown below for those variables with higher correlations and larger differences in means when subset by the `target` response variable. Plots for all predictors against the `target` variable are included in the appendix.  
+
+```{r plots_highest_cor}
+#scatterplot of highly correlated predictors against Target
+
+par(mfrow=c(3,2))
+for (i in c(2,4,6:9)){
+  plot(train_df[ ,i], train_df$target, main = paste(names(train_df[i]), "vs. Target"), xlab = names(train_df)[i], ylab = "Target")
+}
+```
+
+
+
+```{r, echo = FALSE, eval = FALSE}
+# Some of the values in each predictor are leverage points, and due to the outliers in each variable, may be bad leverage points (standard residuals with abs. value > 2) depending on what predictors are used in our models. Transformations on the predictors with higher skewness may elminate these leverage points as well.  
+# Scatterplots of predictors against response for appendix
+
+par(mfrow=c(4,3), mar=c(1,1,1,1))
+for (i in c(1,2,4:13)){
+  plot(train_df[ ,i], train_df$target, main = paste(names(train_df[i]), "vs. Target"), xlab = names(train_df)[i], ylab = "Target")
+}
+
+# `chas` plotted separately since it is a two-level factor
+
+par(mfrow=c(1,1))
+plot(jitter(train_df$chas), jitter(train_df$target, amount=.005), main="Charles River vs.Target", xlab="chas", ylab="target") # jitter applied to prevent points in corners
+```  
+
+## Data Preparation
+
+As stated in Part 1, there are no missing values in the training data set, so we do not need to impute any of the variables, or exclude any cases in the data set.  The predictor `black`, which measures the proportion of blacks by town appears to already have been transformed (adding a constant value, squaring, then multiplying by 1000). Undoing this transformation simply results in data that is even more skewed against the response variable, so the transformation was done to reduce this.  
+
+Combining other predictors or using ratios did not seem to create any new meaningful predictors that would improve our models, however due to the left- and right-skewness of some of our predictors, transformations like log, square root, or 1/X reduce the amount of skew and increase the correlation of our predictors to the response.  
+
+In the table below, we can see the effect of each of the transformations on the correlation to the `target` variable. Many of the transformations do not help in improving the correlation, but the log transformation of `nox` and `rad` may fit our models better, as well as the square root of `indus`.
+
+```{r, echo = FALSE}
+# Transformation Table
+
+cors2 <- as.vector(cor(train_df$target, train_df[,1:ncol(train_df)]))
+log_cors <- as.vector(cor(train_df$target, log(train_df[,1:ncol(train_df)])))
+sqrt_cors <- as.vector(cor(train_df$target, sqrt(train_df[,1:ncol(train_df)])))
+recip_cors <- as.vector(cor(train_df$target, (1/train_df[,1:ncol(train_df)])))
+
+header2 <- (c("No Transform", "LOG", "SQ.ROOT", "1/X"))
+
+transforms <- as.data.frame(cbind(cors2, log_cors, sqrt_cors, recip_cors))
+transforms <- round(transforms, 2)
+rownames(transforms) <- colnames(train_df)
+colnames(transforms) <- header2
+pander(transforms) # use kable?
+```  
+
+```{r, echo = FALSE, eval = FALSE}
+#Only for comparison
+
+summary(glm(target ~ nox, data=train_df, family=binomial))
+summary(glm(target ~ log(nox), data=train_df, family=binomial)) # results in lower AIC
+
+summary(glm(target ~ indus, data=train_df, family=binomial))
+summary(glm(target ~ I(indus^.5), data=train_df, family=binomial))
+```
+
+
+#Model Creation
+
+##Model 1: Bayesian Information Criterion
+The first model created utilizes the Bayesian Information Criterion (BIC) to determine the number of predictors to use and which predictors should be used.
+
+```{r BIC, fig.height=3.5}
+train_df$target <- factor(train_df$target) # to factor
+
+regfit.full <- regsubsets(factor(target) ~ ., data=train_df)
+
+par(mfrow = c(1,2))
+
+reg.summary <- summary(regfit.full)
+plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Subset Selection Using BIC")
+BIC_num <- which.min(reg.summary$bic) 
+points(BIC_num, reg.summary$bic[BIC_num], col="red", cex=2, pch=20)
+
+plot(regfit.full, scale="bic", main="Predictors vs. BIC")
+par(mfrow = c(1,1))
+```
+The left plot above shows that the BIC is minimized using 4 predictors.  The plot on the right shows that the 4 predictors with the lowest BIC are `nox`, `age`, `rad`, and `medv`.  As such, a model is created using these predictors; this model is presented below.
+
+```{r model1-run}
+model1 <- glm(target ~ nox + age + rad + medv, family=binomial, data = train_df)
+
+train_df$predicted_model1 <- predict(model1, train_df, type='response')
+train_df$target_model1 <- ifelse(train_df$predicted_model1>0.5, 1, 0)
+
+pander(summary(model1))
+```
+
+The coefficients in this model indicate that nitrogen oxides concentration has the strongest, as well as the most statistically significant, effect on on the target variable.  Age, highway access, and home value all have far weaker effects on the target.  All of the estimated coefficients are statistically significant at the $\alpha = 0.5$ level except `medv` -- the p-value for this coefficient is 0.0534.
+
+The receiver operating characteristic (ROC) curve and confusion matrix returned by this model are shown below:
+```{r model1-perf, fig.height=3, fig.width=4}
+roc_model1 <- roc(target ~ predicted_model1, data = train_df)
+
+plot_roc <- plot(roc_model1, col="red", main = "Model 1 ROC")
+
+pander(confusionMatrix(train_df$target, train_df$target_model1, positive = "1")$table)
+# AUC is  0.957 Accuracy : 0.8712 
+```
+
+This model provides an area under the curve of 0.9570 and an accuracy of 0.8691.
+
+
+##Model 2: Mallow's $C_p$
+The second model created utilizes Mallow's $C_p$ to determine the number of predictors to use and which predictors should be used.
+```{r Cp, fig.height=3.5}
+par(mfrow = c(1,2))
+
+plot(reg.summary$cp, xlab="Number of Predictors", ylab=expression("C"[p]), type="l", main=expression("Subset Selection using C"[p]))
+Cp_num <- which.min(reg.summary$cp)
+points(Cp_num, reg.summary$cp[Cp_num], col="red", cex=2, pch=20)
+
+plot(regfit.full, scale="Cp", main=expression("Predictors vs. C"[p]))
+par(mfrow = c(1,1))
+```
+The left plot above shows that $C_p$ is minimized using 5 predictors.  The plot on the right shows that the 5 predictors with the lowest $C_p$ are `nox`, `age`, `rad`, `ptratio`, and `medv`.  As such, a model is created using these predictors; this model is presented below.
+
+```{r model2-run}
+model2 <- glm(target ~ nox + age + rad + ptratio + medv, family=binomial, data = train_df)
+
+train_df$predicted_model2 <- predict(model2, train_df, type='response')
+train_df$target_model2 <- ifelse(train_df$predicted_model2>0.5, 1, 0)
+
+pander(summary(model2))
+```
+
+As in model 1, the coefficients in this model indicate that nitrogen oxides concentration has the strongest, as well as the most statistically significant, effect on on the target variable.  This may be due to the fact that a single part per 10 million in concentration merits a unit increase in this variable.  Each of the estimated coefficients are statistically signficant.
+
+The ROC curve and confusion matrix returned by this model are shown below:
+
+```{rmodel2-perf, fig.height=3, fig.width=4}
+roc_model2 <- roc(factor(target) ~ predicted_model2, data=train_df)
+
+plot_roc <- plot(roc_model2, col="red", main = "Model 2 ROC")
+
+pander(confusionMatrix(train_df$target, train_df$target_model2, positive = "1")$table)
+#AUC is 0.9605 Accuracy : 0.8691
+```
+
+This model provides an area under the curve of 0.9605 and an accuracy of 0.8691.
+
+
+##Model 3: Transformed BIC
+Model 3 is created using the same BIC selection from Model 1, with modification from transformation.  Based on the distributions of the `nox` and `rad` variables, log transformations of these variables are used.  The model using these transformed variables, the model is presented below.
+```{r model3-run}
+model3 <- glm(target ~ log(nox) + age + log(rad) + medv, family=binomial, data = train_df)
+
+train_df$predicted_model3 <- predict(model3, train_df, type='response')
+train_df$target_model3 <- ifelse(train_df$predicted_model3>0.5, 1, 0)
+
+pander(summary(model3))
+```
+
+In model 3, the coefficient associated with nitrogen oxide concentration is once again the largest in magnitude, although it has decreased in magnitude.  The estimated coefficient for home value is now statistically signficant; however, the coefficient for age no longer is.
+
+The ROC curve and confusion matrix returned by this model are shown below:
+
+```{r model3-perf, fig.height=3, fig.width=4}
+roc_model3 <- roc(factor(target) ~ predicted_model3, data=train_df)
+
+plot_roc <- plot(roc_model3, col="red", main = "Model 3 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model3, positive = "1")$table)
+
+#AUC is 0.9584, Accuracy : 0.8691 
+```
+
+This model has an area under the curve of 0.9584 and an accuracy of 0.8691.
+
+
+##Model 4: Significant BIC
+Like Model 1, this model is formed using best subsets regression with BIC as a criterion for choosing the number of predictors; however, with this model, predictors are removed sequentially until all predictors are statistically significant (p < 0.05). This leads to the removal of age and median home values as predictors.
+```{r model4-run}
+model4 <- glm(target ~ nox+rad, data = train_df, family = binomial(link='logit'))
+
+train_df$predicted_model4 <- predict(model4, train_df, type = 'response')
+train_df$target_model4 <- ifelse(train_df$predicted_model4>0.5, 1, 0)
+
+pander(summary(model4))
+```
+
+The coefficients for this model are similar to the coefficients associated with the two variables in the larger BIC model (Model 1), but show far greater statistical significance with the additional variables removed.
+
+```{r model4-perf, fig.height=3, fig.width=4}
+roc_model4 <- roc(factor(target) ~ predicted_model4, data=train_df)
+
+plot_roc <- plot(roc_model4, col="red", main = "Model 4 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model4, positive = "1")$table)
+
+#AUC is 0.9575, Accuracy: 0.8691
+```
+
+This model has an area under the curve of 0.9575 and an accuracy of 0.8691.
+
+
+
+##Model 5: Best GLM
+The `bestglm` [package](https://cran.r-project.org/web/packages/bestglm/vignettes/bestglm.pdf) is implemented to "[select] the best subset of inputs for the GLM family."  The BIC is still used as the information criterion.  The model generated by the package is presented below.
+```{r model5-run}
+# bestglm_bic <- bestglm(train_df, IC= "BIC", family = binomial) #very slow - do not evaluate
+
+model5 <- glm(target ~ nox +  rad + tax, family=binomial, data = train_df)
+
+train_df$predicted_model5 <- predict(model5, train_df, type='response')
+train_df$target_model5 <- ifelse(train_df$predicted_model5>0.5, 1, 0)
+
+pander(summary(model5))
+```
+
+The coefficients for this model again indicate the strong influence of a unit increase in nitrogen oxide concentration.  The inclusion of property tax rate in the model lead to the first negative coefficient seen.  Each of the coefficient estimates is of very high statistical significance.
+
+```{r model5-perf, fig.height=3, fig.width=4}
+roc_model5 <- pROC::roc(factor(target) ~ predict(model5, train_df, type='response'), data=train_df)
+
+plot_roc <- plot(roc_model5, col="red", main = "Model 5 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model5, positive = "1")$table)
+
+#AUC is 0.8876,  Accuracy : 0.8691
+```
+
+This model has an area under the curve of 0.8876 and an accuracy of 0.8691.
+
+
+##Model 6: Transformed Best GLM
+Using the three variables identified by the `bestglm` function for Model 5, the `nox` and `rad` predictors are transformed using logarithms, as in Model 3.  The model using these transformations is presented below.
+```{r model6-run}
+model6 <- glm(target ~ log(nox) +  log(rad) + tax, family=binomial, data = train_df)
+
+train_df$predicted_model6 <- predict(model5, train_df, type='response')
+train_df$target_model6 <- ifelse(train_df$predicted_model6>0.5, 1, 0)
+
+pander(summary(model6))
+```
+
+The coefficient for nitrogen oxide concentration decreased following the transformation, as did the standard error of the estimate of the coefficient.  While the p-value related to the coefficients changed following the tranformation, all estimates remain statistically significant.
+
+```{r model6-perf, fig.height=3, fig.width=4}
+roc_model6 <- roc(factor(target) ~ predicted_model6, data=train_df)
+
+plot_roc <- plot(roc_model6, col="red", main = "Model 6 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model6, positive = "1")$table)
+
+#AUC is 0.9594,  Accuracy : 0.8884
+```
+
+This model has an area under the curve of 0.9594 and an accuracy of 0.8884.
+
+
+##Model 7: Full Model
+For completeness, a full generalized linear model is created using all explanatory variables.
+```{r model7-run}
+model7 <- glm(target ~ zn+indus+chas+nox+rm+age+dis+rad+tax+ptratio+black+lstat+medv, data = train_df, family = binomial(link='logit'))
+
+train_df$predicted_model7 <- predict(model7, train_df, type = 'response')
+train_df$target_model7 <- ifelse(train_df$predicted_model7 > 0.5, 1, 0)
+
+pander(summary(model7))
+```
+
+The 13 coefficients in the full model vary very widely in magnitude, and five of the coefficients are negative.  There is also a wide range of signifcances -- 5 of the coefficients are not significant under any reasonable $\alpha$, and one is very nearly exactly 0.05.
+
+```{r model7-perf, fig.height=3, fig.width=4}
+roc_model7 <- roc(factor(target) ~ predicted_model7, data=train_df)
+
+plot_roc <- plot(roc_model7, col="red", main = "Model 7 ROC")
+pander(confusionMatrix(train_df$target, train_df$target_model7, positive = "1")$table)
+
+#AUC 0.9753; Accuracy 0.9249
+```
+
+This model has an area under the curve of 0.9753 and an accuracy of 0.9249.
+
+
+
+
+##Model Comparison
+The characteristics and performance of the six models are compared below:
+
+|Model #|# of Predictors|AUC|Accuracy|
+|---|---|---|---|
+|1|4|0.9570|0.8712|
+|2|5|0.9605|0.8691|
+|3|4|0.9584|0.8691|
+|4|2|0.9575|0.8691|
+|5|3|0.8876|0.8691|
+|6|3|0.9594|0.8884|
+|7|13|0.9753|0.9249|
+
+
+#Model Selection and Prediction
+
+The model selected used only the significant predictors (Model 3) was selected as the best model for prediction of `TARGET` in the crime data set.  While the AUC value of this model the second-highest of the four models tested, its mean cross-validation error indicates that it is has the best predictive value for unseen data.  Additionally, it is a parsimonious model, and the simplicity lends itself to easier understanding of the model by other users.
+
+
+##10-fold Cross Validation
+```{r, echo = FALSE}
+k = 10
+set.seed(1306)
+folds = sample(1:k, nrow(train_df), replace = TRUE)
+cv.errors1 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors2 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors3 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors4 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors5 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors6 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors7 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+
+train_df$target = as.numeric(as.character(train_df$target))
+
+for (j in 1:k) {
+  
+  model1 <- glm(target ~ nox + age + rad + medv, family = binomial, data = train_df[folds != j, ])
+  model2 <- glm(target ~ nox + age + rad + ptratio + medv, family = binomial, data = train_df[folds != j, ])
+  model3 <- glm(target ~ log(nox) + age + log(rad) + medv, family = binomial, data = train_df[folds != j, ])
+  model4 <- glm(target ~ log(nox) +  log(rad) + tax, family = binomial, data = train_df[folds != j, ])
+  model5 <- glm(target ~ nox +  rad + tax, family=binomial, data = train_df)
+  model6 <- glm(target ~ log(nox) +  log(rad) + tax, family=binomial, data = train_df)
+  model7 <- glm(target ~ zn+indus+chas+nox+rm+age+dis+rad+tax+ptratio+black+lstat+medv, data = train_df, family = binomial(link='logit'))
+
+  
+    #best.fit = regsubsets(y ~ ., data = train_df[folds != j, ], nvmax = 10)
+    for (i in 1:10) {
+      pred1 = predict(model1, train_df[folds == j, ], id = i)
+      cv.errors1[j, i] = mean((train_df$target[folds == j] - pred1) ^ 2)
+    
+      pred2 = predict(model2, train_df[folds == j, ], id = i)
+      cv.errors2[j, i] = mean((train_df$target[folds == j] - pred2) ^ 2)
+  
+      pred3 = predict(model3, train_df[folds == j, ], id = i)
+      cv.errors3[j, i] = mean((train_df$target[folds == j] - pred3) ^ 2)
+      
+      pred4 = predict(model4, train_df[folds == j, ], id = i)
+      cv.errors4[j, i] = mean((train_df$target[folds == j] - pred4) ^ 2)
+      
+      pred5 = predict(model5, train_df[folds == j, ], id = i)
+      cv.errors5[j, i] = mean((train_df$target[folds == j] - pred5) ^ 2)      
+
+      pred6 = predict(model6, train_df[folds == j, ], id = i)
+      cv.errors6[j, i] = mean((train_df$target[folds == j] - pred6) ^ 2)
+
+      pred7 = predict(model7, train_df[folds == j, ], id = i)
+      cv.errors7[j, i] = mean((train_df$target[folds == j] - pred7) ^ 2)            
+  }
+  
+}
+
+
+#cv.errors1
+mean.cv.errors1 <- apply(cv.errors1, 2, mean)
+#mean.cv.errors1 = apply(cv.errors1, 2, mean)
+
+# which.min(mean.cv.errors1)
+# mean.cv.errors1[6]
+#cv.errors2
+mean.cv.errors2 <- apply(cv.errors2, 2, mean)
+#mean.cv.errors2
+# which.min(mean.cv.errors2)
+# mean.cv.errors2[6]
+
+
+#cv.errors3
+mean.cv.errors3 <- apply(cv.errors3, 2, mean)
+#mean.cv.errors3
+# which.min(mean.cv.errors3)
+# mean.cv.errors3[6]
+
+
+#cv.errors4
+mean.cv.errors4 <- apply(cv.errors4, 2, mean)
+#mean.cv.errors4
+# which.min(mean.cv.errors4)
+# mean.cv.errors4[6]
+
+mean.cv.errors5 <- apply(cv.errors5, 2, mean)
+mean.cv.errors6 <- apply(cv.errors6, 2, mean)
+mean.cv.errors7 <- apply(cv.errors7, 2, mean)
+
+all.cv.error = data.frame(
+mean(mean.cv.errors1),
+mean(mean.cv.errors2),
+mean(mean.cv.errors3),
+mean(mean.cv.errors4), 
+mean(mean.cv.errors5),
+mean(mean.cv.errors6),
+mean(mean.cv.errors7)
+)
+names(all.cv.error) = c("Model1", "Model2", "Model3", "Model4", "Model5", "Model6", "Model7")
+#all.cv.error
+all.cv.error = t(all.cv.error)
+names(all.cv.error) = c("Model", "Mean CV Error")
+
+
+```
+
+
+
+#####Mean CV Error
+```{r cv-erro}
+pander(all.cv.error)
+```
+
+
+The linear model is applied to an evaluation dataset containing response variables for 259 cases.  A table of the predicted team wins is presented below.
+
+```{r evaluation, echo=FALSE}
+#evaluation_data <- read.csv('https://raw.githubusercontent.com/dsmilo/DATA621/master/HW1/data/moneyball-evaluation-data.csv')
+par(mfrow = c(1, 2), pin = c(2, 2))
+
+predicted_wins <- predict(model3, train_df, type='response')
+predicted_wins_bin = ifelse(predicted_wins > 0.5, 1, 0)
+
+
+```
+
+#####Predicted Targets for Test Data
+```{r, echo = FALSE}
+pander(table(predicted_wins_bin))
+```
+
+#####Targets for Training Data
+```{r, echo = FALSE}
+training_wins = train_df$target
+pander(table(training_wins))
+```
+
+Similar to the training dataset, the predictions for the test data set predictions are weighted more toward crime being below the median. It is important to note that Model 3 did not achieve the highest AUC or accuracy on the training data but, given its cross-validation performance, we believe that Model 3 will produce the greatest generalizability of the models explored here.
+
+A comparison of the full sets of predictions for the evaluation dataset is available in Appendix B.
+
+\newpage 
+
+#Appendix A 
+```{r appendix-a}
+
+```
+
+\newpage
+
+#Appendix B -- Index-wise Results from Predictive Model
+```{r appendix-b}
+# appendixB = data.frame(matrix(NA, nrow = 130, ncol = 4))
+# appendixB[, 1] = evaluation_data$INDEX[1:130]
+# appendixB[, 2] = predicted_wins[1:130] 
+# appendixB[, 3] = c(evaluation_data$INDEX[131:259], NA)
+# appendixB[, 4] = c(predicted_wins[131:259], NA)
+# #appendixB = appendixB[-130:259,]
+# names(appendixB) = c("Index", "Predicted Value", "Index", "Predicted Value")
+# 
+# pander(appendixB)
+```
+
+\newpage
+
+#Appendix C -- R Code
+
+```{r appendix-c, echo = TRUE, eval = FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+
+```
