@@ -364,7 +364,7 @@ train_df$target_model7 <- ifelse(train_df$predicted_model7 > 0.5, 1, 0)
 pander(summary(model7))
 ```
 
-The 13 coefficients in the full model vary very widely in magnitude, and five of the coefficients are negative.  There is also a wide range of signifcances -- 5 of the coefficients are not significant under any reasonable $\alpha$, and one is very nearly exactly 0.05.
+The 13 coefficients in the full model vary very widely in magnitude, and five of the coefficients are negative.  There is also a wide range of signifcances -- 5 of the coefficients are not significant under any reasonable $\alpha$, and one is very nearly exactly 0.05.  It is interesting to note that the coefficient for `indus` is negative, while the correlation of this variable with `target` is relatively strongly positive -- this may be due to collinearity between `indus` and `nox` -- highly industrialized neighborhoods will likely have higher air pollution.
 
 ```{r model7-perf, fig.height=3, fig.width=4}
 roc_model7 <- roc(factor(target) ~ predicted_model7, data=train_df)
