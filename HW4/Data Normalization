@@ -1,0 +1,75 @@
+```{r}
+library(stringr) #For string functions
+library(glmnet) #For binary logistic regression
+library(leaps) #For best subsets
+library(pROC) #For ROC curve
+library(car)
+library(MASS)
+
+#Import the data, with strings as factors - this makes the summaries of the strings as factors columns display as discrete groups in the summaries
+train_data <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv"))
+summary(train)
+nrow(train)
+
+#Import the data, with strings as factors as false
+train <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv"), stringsAsFactors = FALSE)
+
+#Data normalization Stage - convert all data to quantitative, usable format.
+train <- train_data
+
+#Remove all $ signs and commas, i.e. from INCOME, HOME_VAL, BLUEBOOK, OLDCLAIM
+train$INCOME <- as.numeric(str_replace_all(train$INCOME, "[[:punct:]\\$]",""))
+train$HOME_VAL <- as.numeric(str_replace_all(train$HOME_VAL, "[[:punct:]\\$]",""))
+train$BLUEBOOK <- as.numeric(str_replace_all(train$BLUEBOOK, "[[:punct:]\\$]",""))
+train$OLDCLAIM <- as.numeric(str_replace_all(train$OLDCLAIM, "[[:punct:]\\$]",""))
+
+
+#Convert indicator variables to 0s and 1s; 1 = Yes, Male for Sex, Commercial for Car Use, Red for RED_CAR, and Highly Urban for URBANICITY
+train$PARENT1 <- ifelse(train$PARENT1=="Yes", 1, 0)
+train$MSTATUS <- ifelse(train$MSTATUS=="Yes", 1, 0)
+train$SEX <- ifelse(train$SEX=="M", 1, 0)
+train$CAR_USE <- ifelse(train$CAR_USE=="Commercial", 1, 0)
+train$RED_CAR <- ifelse(train$RED_CAR=="Yes", 1, 0)
+train$REVOKED <- ifelse(train$REVOKED=="Yes", 1, 0)
+train$URBANICITY <- ifelse(train$URBANICITY == "Highly Urban/ Urban", 1, 0)
+
+#Convert categorical predictor values to indicator variables - EDUCATION, CAR_TYPE, JOB
+
+#EDUCATION, High school graduate is base case
+train$HSDropout <- ifelse(train$EDUCATION=="<High School", 1, 0)
+train$Bachelors <- ifelse(train$EDUCATION=="Bachelors", 1, 0)
+train$Masters <- ifelse(train$EDUCATION=="Masters", 1, 0)
+train$PhD <- ifelse(train$EDUCATION=="PhD", 1, 0)
+
+#CAR_TYPE, base case is minivan
+train$Panel_Truck <- ifelse(train$CAR_TYPE=="Panel Truck", 1, 0)
+train$Pickup <- ifelse(train$CAR_TYPE=="Pickup", 1, 0)
+train$Sports_Car <- ifelse(train$CAR_TYPE=="Sports Car", 1, 0)
+train$Van <- ifelse(train$CAR_TYPE=="Van", 1, 0)
+train$SUV <- ifelse(train$CAR_TYPE=="z_SUV", 1, 0)
+
+#JOB, base case is ""
+train$Professional <- ifelse(train$JOB == "Professional", 1, 0)
+train$Blue_Collar <- ifelse(train$JOB == "Professional", 1, 0)
+train$Clerical <- ifelse(train$JOB == "Clerical", 1, 0)
+train$Doctor <- ifelse(train$JOB == "Doctor", 1, 0)
+train$Lawyer <- ifelse(train$JOB == "Lawyer", 1, 0)
+train$Manager <- ifelse(train$JOB == "Manager", 1, 0)
+train$Home_Maker <- ifelse(train$JOB == "Home Maker", 1, 0)
+train$Student <- ifelse(train$JOB == "Student", 1, 0)
+
+train <- train[,-c(13,14,19)] #Remove EDUCATION, CAR_TYPE and JOB from the dataframe.
+train_flag <- train[,-c(1,3)] #Training dataset with response of crash or no crash
+train_amount <- train[,-c(1,2)] #Training dataset with response of claim amount
+
+glmflag <- glm(TARGET_FLAG ~.-RED_CAR - Blue_Collar, data = train_flag, family = binomial(link='logit'))
+summary(lmflag)
+vif(lmflag) #Check for collinearity, VIF > 10
+
+lmflag <- update(glmflag, .~.-HSDropout-Home_Maker-Professional-Student-AGE-HOMEKIDS-Doctor-Lawyer-CAR_AGE-SEX-YOJ-Clerical)
+summary(lmflag)
+
+predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(lmflag, train_flag)) #Predictions using the lmflag model
+roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
+
+```
