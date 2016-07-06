@@ -5,11 +5,13 @@ library(leaps) #For best subsets
 library(pROC) #For ROC curve
 library(car)
 library(MASS)
+library(ROCR)
+library(ggplot2)
 
 #Import the data, with strings as factors - this makes the summaries of the strings as factors columns display as discrete groups in the summaries
 train_data <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv"))
-summary(train)
-nrow(train)
+#summary(train)
+#nrow(train)
 
 #Import the data, with strings as factors as false
 train <- read.csv(url("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv"), stringsAsFactors = FALSE)
@@ -100,7 +102,14 @@ plotROC <- function(model, ndata, gtruth) {
   ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) + geom_ribbon(alpha=0.2) + geom_line(aes(y=tpr)) + ggtitle(paste0("ROC Curve w/ AUC=", auc))
 }
 
+predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(lmflag, train_flag))
+#pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
 
+summary(glm(TARGET_FLAG~., data = train_flag, family = binomial(link='logit')))
+```
+
+##Full Model
+```{r}
 #Full Model, with two predictors that appear to be linear combinations removed (RED_CAR and Blue_Collar)
 glmflagfull <- glm(TARGET_FLAG ~.-RED_CAR - Blue_Collar, data = train_flag, family = binomial(link='logit'))
 summary(glmflagfull)
@@ -111,7 +120,10 @@ plotROC(model = glmflagfull, ndata = train_flag[, -1], gtruth = train$TARGET_FLA
 
 glmamountfull <- lm(TARGET_AMT ~.-RED_CAR-Blue_Collar, data = train_amount)
 summary(glmamountfull)
+```
 
+##Reduced Model
+```{r}
 #Reduced Model with non-significant predictors removed
 glmflagreduced <- update(glmflagfull, .~.-HSDropout-Home_Maker-Professional-Student-HOMEKIDS-CAR_AGE-YOJ-Lawyer-SEX-AGE-Doctor-Clerical)
 summary(glmflagreduced)
@@ -122,6 +134,10 @@ plotROC(model = glmflagreduced, ndata = train_flag[, -1], gtruth = train$TARGET_
 glmamountreduced <- update(glmamountfull, .~.-YOJ-AGE-Lawyer-Masters-OLDCLAIM-Home_Maker-Clerical-Bachelors-Professional-HOMEKIDS-HOME_VAL-Panel_Truck-HSDropout-PhD-Student-Doctor-Pickup-Van)
 summary(glmamountreduced)
 predglmamountreduced <- data.frame("class" = train_amount$TARGET_AMT, "logit" = predict(glmamountreduced, train_amount))
+```
+
+##Best Subsets
+```{r}
 
 
 #TARGET_FLAG Best subsets of full model, without RED_CAR and Blue_Collar which seem to be linear combinations of other predictors for some reason
@@ -138,7 +154,7 @@ minbic <- which.min(reg.summary$bic)
 points(minbic, reg.summary$bic[minbic], col = "brown", cex = 2, pch = 20)
 coef(regfit.full, minbic)
 var_names = names(coef(regfit.full, minbic))[2:length(names(coef(regfit.full, minbic)))]
-var_names
+length(var_names)
 
 Model_toEval = paste0("glm(TARGET_FLAG ~ ", paste(var_names, collapse = " + "), ", data = train_flag, family = binomial(link='logit'))" )
 
@@ -152,8 +168,5 @@ summary(bestsubset21)
 plotROC(model = bestsubset21, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
 
 
-predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(lmflag, train_flag))
-#pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
-
-summary(glm(TARGET_FLAG~., data = train_flag, family = binomial(link='logit')))
 ```
+
