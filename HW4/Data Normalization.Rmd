@@ -59,30 +59,55 @@ train$Home_Maker <- ifelse(train$JOB == "Home Maker", 1, 0)
 train$Student <- ifelse(train$JOB == "Student", 1, 0)
 
 train <- train[,-c(13,14,19)] #Remove EDUCATION, CAR_TYPE and JOB from the dataframe.
+
+train_bk = train
+
+fillwithmedian <- function(x) {
+  median_val = median(x, na.rm = TRUE)
+  x[is.na(x)] = median_val
+  return(x)
+}
+
+train_bk = data.frame(lapply(train_bk, fillwithmedian))
+
+train = train_bk
+
 train_flag <- train[,-c(1,3)] #Training dataset with response of crash or no crash
 train_amount <- train[,-c(1,2)] #Training dataset with response of claim amount
 
 glmflag <- glm(TARGET_FLAG ~.-RED_CAR - Blue_Collar, data = train_flag, family = binomial(link='logit'))
-summary(lmflag)
-vif(lmflag) #Check for collinearity, VIF > 10
+summary(glmflag)
+vif(glmflag) #Check for collinearity, VIF > 10
 
 lmflag <- update(glmflag, .~.-HSDropout-Home_Maker-Professional-Student-AGE-HOMEKIDS-Doctor-Lawyer-CAR_AGE-SEX-YOJ-Clerical)
 summary(lmflag)
 
 predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(lmflag, train_flag)) #Predictions using the lmflag model
-roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
+pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
 
 ```
 
 #####Basic regression modeling
 
 ```{r}
+plotROC <- function(model, ndata, gtruth) {
+  prob <- predict(model, newdata = ndata, type="response")
+  pred <- prediction(prob, gtruth)
+  perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+  auc <- performance(pred, measure = "auc")
+  auc <- auc@y.values[[1]]
+  roc.data <- data.frame(fpr=unlist(perf@x.values), tpr=unlist(perf@y.values), model="GLM")
+  ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) + geom_ribbon(alpha=0.2) + geom_line(aes(y=tpr)) + ggtitle(paste0("ROC Curve w/ AUC=", auc))
+}
+
+
 #Full Model, with two predictors that appear to be linear combinations removed (RED_CAR and Blue_Collar)
 glmflagfull <- glm(TARGET_FLAG ~.-RED_CAR - Blue_Collar, data = train_flag, family = binomial(link='logit'))
 summary(glmflagfull)
 vif(glmflagfull) #Check for collinearity, VIF > 10
 predglmflagfull <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagfull, train_flag))
-roc(class ~ logit, data = predglmflagfull, auc = TRUE, plot = TRUE, smooth =  TRUE)
+#pROC::roc(class ~ logit, data = predglmflagfull, auc = TRUE, plot = TRUE, smooth =  TRUE)
+plotROC(model = glmflagfull, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
 
 glmamountfull <- lm(TARGET_AMT ~.-RED_CAR-Blue_Collar, data = train_amount)
 summary(glmamountfull)
@@ -91,7 +116,8 @@ summary(glmamountfull)
 glmflagreduced <- update(glmflagfull, .~.-HSDropout-Home_Maker-Professional-Student-HOMEKIDS-CAR_AGE-YOJ-Lawyer-SEX-AGE-Doctor-Clerical)
 summary(glmflagreduced)
 predglmflagreduced <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagreduced, train_flag))
-roc(class ~ logit, data = predglmflagreduced, auc = TRUE, plot = TRUE, smooth =  TRUE)
+#pROC::roc(class ~ logit, data = predglmflagreduced, auc = TRUE, plot = TRUE, smooth =  TRUE)
+plotROC(model = glmflagreduced, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
 
 glmamountreduced <- update(glmamountfull, .~.-YOJ-AGE-Lawyer-Masters-OLDCLAIM-Home_Maker-Clerical-Bachelors-Professional-HOMEKIDS-HOME_VAL-Panel_Truck-HSDropout-PhD-Student-Doctor-Pickup-Van)
 summary(glmamountreduced)
@@ -99,7 +125,7 @@ predglmamountreduced <- data.frame("class" = train_amount$TARGET_AMT, "logit" = 
 
 
 #TARGET_FLAG Best subsets of full model, without RED_CAR and Blue_Collar which seem to be linear combinations of other predictors for some reason
-regfit.full <- regsubsets(TARGET_FLAG~.-RED_CAR-Blue_Collar, data = train_flag)
+regfit.full <- regsubsets(TARGET_FLAG~.-RED_CAR-Blue_Collar, data = train_flag, nvmax = 35)
 summary(regfit.full)
 par(mar=c(1,1,1,1))
 par(mfrow = c(1, 2))
@@ -111,16 +137,23 @@ plot(reg.summary$bic, xlab = "Number of Predictors", ylab = "BIC", type = "l",
 minbic <- which.min(reg.summary$bic)
 points(minbic, reg.summary$bic[minbic], col = "brown", cex = 2, pch = 20)
 coef(regfit.full, minbic)
-names(coef(regfit.full, minbic))[2:9]
-bestsubset8 <- glm(TARGET_FLAG ~PARENT1+HOME_VAL+CAR_USE + BLUEBOOK + REVOKED + MVR_PTS + URBANICITY + Manager, data = train_flag, family = binomial(link='logit'))
-summary(bestsubset8)
-predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(bestsubset8, train_flag))
-roc(class ~ logit, data = bestsubset8, auc = TRUE, plot = TRUE, smooth =  TRUE)
+var_names = names(coef(regfit.full, minbic))[2:length(names(coef(regfit.full, minbic)))]
+var_names
 
+Model_toEval = paste0("glm(TARGET_FLAG ~ ", paste(var_names, collapse = " + "), ", data = train_flag, family = binomial(link='logit'))" )
+
+#bestsubset8 <- glm(TARGET_FLAG ~ paste(var_names, collapse = " + "), data = train_flag, family = binomial(link='logit'))
+
+bestsubset21 = eval(parse(text = Model_toEval))
+
+summary(bestsubset21)
+#predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(bestsubset21, train_flag[,-1]))
+#pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
+plotROC(model = bestsubset21, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
 
 
 predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(lmflag, train_flag))
-roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
+#pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
 
 summary(glm(TARGET_FLAG~., data = train_flag, family = binomial(link='logit')))
 ```
