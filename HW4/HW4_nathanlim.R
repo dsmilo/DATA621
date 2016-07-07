@@ -88,26 +88,42 @@ crash_df <- crash_data %>%
 #FULL model
 fullmodel <- glm(TARGET_AMT ~., data = crash_df)
 summary(fullmodel)
+# AIC: 22348
+
+fullmodel_log <- glm(log(TARGET_AMT) ~., data = crash_df)
+summary(fullmodel_log)
+#AIC: 2647.2
 
 #BIC
-regfit.full=regsubsets(TARGET_AMT ~., data=crash_df)
+regfit.full=regsubsets(log(TARGET_AMT) ~., data=crash_df)
 reg.summary <- summary(regfit.full)
 plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
 plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Best subset Selection using BIC")
 which.min(reg.summary$bic) 
 points(1, reg.summary$bic[1], col="red", cex=2, pch=20)
 
-glm_model_bic <- glm(TARGET_AMT ~ BLUEBOOK, data = crash_df)
+glm_model_bic <- glm(log(TARGET_AMT) ~ BLUEBOOK, data = crash_df)
 summary(glm_model_bic)
+#AIC: 2613.9
+
+glm_model_bic_log <- glm(log(TARGET_AMT) ~ log(BLUEBOOK), data = crash_df)
+summary(glm_model_bic_log)
+#AIC: 2607.6
+
 
 #Cp
 plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
 plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
 reg.summary$cp
-points(9, reg.summary$cp[9],col="red", cex=2, pch=20)
+points(2, reg.summary$cp[2],col="red", cex=2, pch=20)
+points(7, reg.summary$cp[7],col="red", cex=2, pch=20)
 
 
-glm_model_cp <- glm(TARGET_AMT ~MSTATUS + SEX + BLUEBOOK + MVR_PTS + CAR_AGE + Sports_Car + Van + SUV + Manager, data = crash_df)
-summary(glm_model_cp)
+model_cp <- glm(log(TARGET_AMT) ~ HOME_VAL + SEX + BLUEBOOK + MVR_PTS + CAR_AGE + Pickup + Sports_Car + Van + SUV, data = crash_df)
+summary(model_cp)
+# AIC: 2615.9
 
 
+model_cp2 <- glm(log(TARGET_AMT) ~ log(BLUEBOOK) + MVR_PTS, data = crash_df)
+summary(model_cp2)
+# AIC: 2605.8
