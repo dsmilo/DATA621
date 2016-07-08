@@ -75,7 +75,7 @@ Finally, there are three categorical variables -- factors with more than two lev
   * `CAR_TYPE`: using Minivan as the base case
   * `JOB`: using the blank value as the base case
   
-```{r binary-dummy}
+```{r logistic-dummy}
 #Convert indicator variables to 0s and 1s; 1 = Yes, Male for Sex, Commercial for Car Use, Red for RED_CAR, and Highly Urban for URBANICITY
 train$PARENT1 <- ifelse(train$PARENT1=="Yes", 1, 0)
 train$MSTATUS <- ifelse(train$MSTATUS=="Yes", 1, 0)
@@ -138,7 +138,7 @@ The large number of binary variables in the dataset makes graphical visualizatio
 
 \pagebreak
 
-```{r binary-tables}
+```{r logistic-tables}
 binaries <- train %>% dplyr::select(-c(TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, CAR_AGE))
 
 binarytable <- t(sapply(binaries, table)/nrow(binaries))
@@ -186,18 +186,231 @@ numeric$TARGET_FLAG <- factor(numeric$TARGET_FLAG)
 ggplot(numeric, aes(TARGET_FLAG, value)) + geom_boxplot(aes(fill = TARGET_FLAG), alpha = 0.5) + facet_wrap(~variable, scale="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by TARGET_FLAG\n")
 ```
 
-Interestingly, there is not an immediately visible difference in median value based on `TARGET_FLAG` values, while the range of predictor values for each flag value differs noticeably.
+Interestingly, there are only a few variables with immediately visible difference in median value based on `TARGET_FLAG` values, while the range of predictor values for each flag value differs noticeably.
 
 # Data Preparation
+As stated in Part 1, four predictor variables have missing values.  Because these missing values represent, in many cases, a non-menial proportion of the dataset at large, they are imputed so the cases containing missing values can be included in modeling.  Due to the skewness illustrated by some of the variables with missing data (`INCOME` and `HOME_VAL`), the median is used to avoid any bias introduced into the mean by the skewness of these variables' distribution.  For the remaining two variables, the median is also used for imputation for consistency.
+
+Additionally, there is one instance of a vehicle's `CAR_AGE` being -3.  Since this variable represents the age of the car in years, this is a nonsensical value.  This instance of this variable is removed before imputation.
+
+```{r impute-median}
+train$CAR_AGE[train$CAR_AGE == -3] <- NA
+
+fillwithmedian <- function(x) {
+  median_val = median(x, na.rm = TRUE)
+  x[is.na(x)] = median_val
+  return(x)
+}
+
+train <- data.frame(lapply(train, fillwithmedian))
+```
+
+A summary of the variables with imputation of median values is presented below:
+
+\pagebreak
+
+```{r summary-imputed}
+means <- sapply(train, mean)
+medians <- sapply(train, median)
+IQRs <- sapply(train, IQR)
+skews <- sapply(train, skewness)
+cors_flag <- as.vector(cor(train$TARGET_FLAG, train[,1:ncol(train)]))
+cors_amt <- as.vector(cor(train$TARGET_AMT, train[,1:ncol(train)]))
+NAs <- sapply(train, function(y) sum(length(which(is.na(y)))))
+
+imputedsummary <- data.frame(means, medians, IQRs, skews, cors_flag, cors_amt, NAs)
+colnames(imputedsummary) <- c("MEAN", "MEDIAN", "IQR", "SKEW", "$r_{FLAG}$", "$r_{AMT}$", "NAs")
+imputedsummary <- round(imputedsummary, 2)
+pander(imputedsummary)
+```
+
+The creation of additional or combined predictors did not yield any predictors that would improve models, however due to the skewness of some  predictors, log transformations were conducted.
+
+In the table below, we can see the effect of each of the log transformation on the correlations to the two target variables. For many variables, the transformations do not improve the correlation, but the log transformations of `INCOME` and `HOME_VAL` may fit our models better.
+
+\pagebreak
+
+```{r, echo = FALSE}
+# Log tranform -- addition of 0.01 to correct for 0 values yieling NaN
+cors_flag_log <- as.vector(cor(train$TARGET_FLAG, log(train[,1:ncol(train)] + 0.01)))
+cors_amt_log  <- as.vector(cor(train$TARGET_AMT, log(train[,1:ncol(train)] + 0.01)))
+
+transforms <- as.data.frame(cbind(cors_flag, cors_flag_log, cors_amt, cors_amt_log))
+transforms <- round(transforms, 2)
+rownames(transforms) <- colnames(train)
+colnames(transforms) <- c("$r_{FLAG}$", "log $r_{FLAG}$", "$r_{AMT}$", "log $r_{AMT}$")
+pander(transforms)
+```  
+
+```{r split-dataset}
+train_flag <- train[,-2] #Training dataset with response of crash or no crash
+train_amt  <- train[,-1] #Training dataset with response of claim amount
+```
 
 
+\newpage
 
 # Model Creation
 
+```{r plotROC}
+plotROC <- function(model, ndata, gtruth) {
+  prob <- predict(model, newdata = ndata, type="response")
+  pred <- prediction(prob, gtruth)
+  perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+  auc <- performance(pred, measure = "auc")
+  auc <- auc@y.values[[1]]
+  roc.data <- data.frame(fpr=unlist(perf@x.values), tpr=unlist(perf@y.values), model="GLM")
+  ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) + geom_ribbon(alpha=0.2) + geom_line(aes(y=tpr)) + ggtitle(paste0("ROC Curve w/ AUC=", auc))
+}
+```
+
 ## Multiple Linear Regression
+
+### Full Model
+```{r linear-full-model}
+fullmodel <- glm(TARGET_AMT ~., data = train_amt)
+pander(summary(fullmodel))
+# AIC: 35300
+```
+
+
+### Log-Transformed Full Model
+```{r linear-log-full-model}
+fullmodel_log <- glm(log(TARGET_AMT + 0.01) ~., data = train_amt)
+pander(summary(fullmodel_log))
+#AIC: 4108.2
+```
+
+### Bayesian Information Criteria
+```{r linear-bic}
+regfit.full=regsubsets(log(TARGET_AMT + 0.01) ~., data=train_amt)
+reg.summary <- summary(regfit.full)
+
+par(mfrow = c(1,2))
+plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
+plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Best subset Selection using BIC")
+which.min(reg.summary$bic) 
+points(1, reg.summary$bic[1], col="red", cex=2, pch=20)
+par(mfrow = c(1,1))
+```
+
+```{r linear-bic-log}
+glm_model_bic <- glm(log(TARGET_AMT + 0.01) ~ BLUEBOOK, data = train_amt)
+pander(summary(glm_model_bic))
+#AIC: 4073.1
+```
+
+```{r linear-bic-log-log}
+glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(BLUEBOOK), data = train_amt)
+pander(summary(glm_model_bic_log))
+#AIC: 4065
+```
+
+
+### Mallow's $C_p$
+```{r linear-cp}
+regfit.full=regsubsets(log(TARGET_AMT + 0.01) ~., data=train_amt)
+reg.summary <- summary(regfit.full)
+
+par(mfrow = c(1,2))
+plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
+plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
+par(mfrow = c(1,1))
+
+which.min(reg.summary$bic) 
+points(1, reg.summary$bic[1], col="red", cex=2, pch=20)
+```
+
+```{r linear-cp-log}
+glm_model_bic <- glm(log(TARGET_AMT + 0.01) ~ BLUEBOOK, data = train_amt)
+pander(summary(glm_model_bic))
+#AIC: 4073.1
+```
+
+```{r linear-cp-log-log}
+glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(BLUEBOOK), data = train_amt)
+pander(summary(glm_model_bic_log))
+#AIC: 4065
+```
 
 
 ## Binary Logistic Regression
+
+
+### Full Model
+```{r logistic-full-model}
+#Full Model, with two predictors that appear to be linear combinations removed (RED_CAR and Blue_Collar)
+glmflagfull <- glm(TARGET_FLAG ~.-RED_CAR - Blue_Collar, data = train_flag, family = binomial(link='logit'))
+pander(summary(glmflagfull))
+pander(vif(glmflagfull)) #Check for collinearity, VIF > 10
+predglmflagfull <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagfull, train_flag))
+#pROC::roc(class ~ logit, data = predglmflagfull, auc = TRUE, plot = TRUE, smooth =  TRUE)
+plotROC(model = glmflagfull, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
+
+glmamountfull <- lm(TARGET_AMT ~.-RED_CAR-Blue_Collar, data = train_amt)
+pander(summary(glmamountfull))
+```
+
+### Reduced Model
+```{r logistic-reduced-model}
+#Reduced Model with non-significant predictors removed
+glmflagreduced <- update(glmflagfull, .~.-HSDropout-Home_Maker-Professional-Student-HOMEKIDS-CAR_AGE-YOJ-Lawyer-SEX-AGE-Doctor-Clerical)
+pander(summary(glmflagreduced))
+
+predglmflagreduced <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagreduced, train_flag))
+#pROC::roc(class ~ logit, data = predglmflagreduced, auc = TRUE, plot = TRUE, smooth =  TRUE)
+plotROC(model = glmflagreduced, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
+
+glmamountreduced <- update(glmamountfull, .~.-YOJ-AGE-Lawyer-Masters-OLDCLAIM-Home_Maker-Clerical-Bachelors-Professional-HOMEKIDS-HOME_VAL-Panel_Truck-HSDropout-PhD-Student-Doctor-Pickup-Van)
+pander(summary(glmamountreduced))
+
+predglmamountreduced <- data.frame("class" = train_amt$TARGET_AMT, "logit" = predict(glmamountreduced, train_amt))
+```
+
+### Best Subsets
+```{r logistic-best-subsets}
+#TARGET_FLAG Best subsets of full model, without RED_CAR and Blue_Collar which seem to be linear combinations of other predictors for some reason
+regfit.full <- regsubsets(TARGET_FLAG~.-RED_CAR-Blue_Collar, data = train_flag, nvmax = 35)
+#pander(summary(regfit.full))
+
+par(mar=c(1,1,1,1))
+par(mfrow = c(1, 2))
+plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
+reg.summary <- summary(regfit.full)
+# reg.summary$bic
+plot(reg.summary$bic, xlab = "Number of Predictors", ylab = "BIC", type = "l",
+     main = "Best Subset Selection Using BIC")
+minbic <- which.min(reg.summary$bic)
+points(minbic, reg.summary$bic[minbic], col = "brown", cex = 2, pch = 20)
+#coef(regfit.full, minbic)
+var_names = names(coef(regfit.full, minbic))[2:length(names(coef(regfit.full, minbic)))]
+#length(var_names)
+
+Model_toEval = paste0("glm(TARGET_FLAG ~ ", paste(var_names, collapse = " + "), ", data = train_flag, family = binomial(link='logit'))" )
+
+#bestsubset8 <- glm(TARGET_FLAG ~ paste(var_names, collapse = " + "), data = train_flag, family = binomial(link='logit'))
+
+bestsubset21 = eval(parse(text = Model_toEval))
+
+pander(summary(bestsubset21))
+#predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(bestsubset21, train_flag[,-1]))
+#pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
+plotROC(model = bestsubset21, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
+```
+
+### Asher's Models
+```{r logistic-asher-models}
+glmflag <- glm(TARGET_FLAG ~.-RED_CAR - Blue_Collar, data = train_flag, family = binomial(link='logit'))
+pander(summary(glmflag))
+pander(vif(glmflag)) #Check for collinearity, VIF > 10
+
+lmflag <- update(glmflag, .~.-HSDropout-Home_Maker-Professional-Student-AGE-HOMEKIDS-Doctor-Lawyer-CAR_AGE-SEX-YOJ-Clerical)
+pander(summary(lmflag))
+
+predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(lmflag, train_flag)) #Predictions using the lmflag model
+pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
+```
+
 
 
 
@@ -210,9 +423,8 @@ Interestingly, there is not an immediately visible difference in median value ba
 \newpage 
 
 # Appendix A: Index-wise Results from Predictive Model {-}
-```{r appendix-a, eval=FALSE}
+```{r appendix-a}
 appendixA = data.frame(matrix(NA, nrow = 2141, ncol = 4))
-
 
 names(appendixA) = c("Index", "Predicted Probability", "Predicted Classifcation", "Predicted Cost")
 
@@ -223,6 +435,6 @@ pander(appendixA)
 
 # Appendix B: R Code {-}
 
-```{r appendix-b, eval=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r appendix-b, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
 ```
