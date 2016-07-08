@@ -10,9 +10,10 @@ library(vcd)
 
 
 train <- read.csv("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv")
-
+train$EDUCATION
 head(train)
 summary(train)
+
 
 # AGE, YOJ,  INCOME, HOME_VAL, CAR_AGE have NAs
 
@@ -51,7 +52,7 @@ train$URBANICITY <- ifelse(train$URBANICITY == "Highly Urban/ Urban", 1, 0)
 
 #EDUCATION, High school graduate is base case
 
-train$EDUCATION <- as.numeric(factor(train$EDUCATION, levels = c("<High School", "Bachelors", "Masters", "PhD")))
+train$EDUCATION <- as.numeric(factor(train$EDUCATION, levels = c("<High School", "z_High School", "Bachelors", "Masters", "PhD")))-1
 
 
 #CAR_TYPE, base case is minivan
@@ -75,7 +76,13 @@ train$Student <- ifelse(train$JOB == "Student", 1, 0)
 df <- train %>%
       dplyr::select(-c(INDEX,CAR_TYPE,JOB))
 
+str(df) # 8161
+
 new_df=df[complete.cases(df),]
+
+str(new_df) # 6448
+
+#I choose to delete NA including records
 
 
 crash_data = new_df[which(new_df$TARGET_FLAG==1),]
@@ -88,11 +95,11 @@ crash_df <- crash_data %>%
 #FULL model
 fullmodel <- glm(TARGET_AMT ~., data = crash_df)
 summary(fullmodel)
-# AIC: 22348
+# AIC: 35300
 
 fullmodel_log <- glm(log(TARGET_AMT) ~., data = crash_df)
 summary(fullmodel_log)
-#AIC: 2647.2
+#AIC: 4108.2
 
 #BIC
 regfit.full=regsubsets(log(TARGET_AMT) ~., data=crash_df)
@@ -104,26 +111,24 @@ points(1, reg.summary$bic[1], col="red", cex=2, pch=20)
 
 glm_model_bic <- glm(log(TARGET_AMT) ~ BLUEBOOK, data = crash_df)
 summary(glm_model_bic)
-#AIC: 2613.9
+#AIC: 4073.1
 
 glm_model_bic_log <- glm(log(TARGET_AMT) ~ log(BLUEBOOK), data = crash_df)
 summary(glm_model_bic_log)
-#AIC: 2607.6
-
+#AIC: 4065
 
 #Cp
 plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
 plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
 reg.summary$cp
-points(2, reg.summary$cp[2],col="red", cex=2, pch=20)
-points(7, reg.summary$cp[7],col="red", cex=2, pch=20)
+points(4, reg.summary$cp[4],col="red", cex=2, pch=20)
 
 
-model_cp <- glm(log(TARGET_AMT) ~ HOME_VAL + SEX + BLUEBOOK + MVR_PTS + CAR_AGE + Pickup + Sports_Car + Van + SUV, data = crash_df)
+model_cp <- glm(log(TARGET_AMT) ~ MSTATUS + BLUEBOOK + MVR_PTS + Professional, data = crash_df)
 summary(model_cp)
-# AIC: 2615.9
+# AIC: 4069.9
 
 
-model_cp2 <- glm(log(TARGET_AMT) ~ log(BLUEBOOK) + MVR_PTS, data = crash_df)
+model_cp2 <- glm(log(TARGET_AMT) ~ MSTATUS + log(BLUEBOOK) + MVR_PTS + Professional, data = crash_df)
 summary(model_cp2)
-# AIC: 2605.8
+# AIC: 4061.8
