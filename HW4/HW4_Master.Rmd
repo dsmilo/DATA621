@@ -6,6 +6,7 @@ date: "Due July 10, 2016"
 output: 
   pdf_document: 
     toc: yes
+    number_sections: yes
 geometry: margin=0.5in
 ---
 
@@ -37,6 +38,7 @@ library(e1071)
 train <- read.csv("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv")
 ```
 
+\newpage
 
 # Data Exploration
 The dataset of interest contains information about customers of an auto insurance company.  The dataset has 8161 rows (each representing a customer) and 25 variables.  There are 23 predictor variables and 2 response variables: `TARGET_FLAG`, a binary categorical variable representing whether each customer has been in an accident; and `TARGET_AMT`, a numerical variable indicating the cost of a crash that a customer was in.  The class of variables read in from the dataset is presented below:
@@ -72,7 +74,7 @@ Finally, there are three categorical variables -- factors with more than two lev
   * `EDUCATION`: using High School as the base case
   * `CAR_TYPE`: using Minivan as the base case
   * `JOB`: using the blank value as the base case
-
+  
 ```{r binary-dummy}
 #Convert indicator variables to 0s and 1s; 1 = Yes, Male for Sex, Commercial for Car Use, Red for RED_CAR, and Highly Urban for URBANICITY
 train$PARENT1 <- ifelse(train$PARENT1=="Yes", 1, 0)
@@ -111,6 +113,8 @@ train$Student <- ifelse(train$JOB == "Student", 1, 0)
 train <- train %>% dplyr::select(-c(INDEX,EDUCATION,CAR_TYPE,JOB))
 ```
 
+\pagebreak
+
 A summary of each variable is presented below:
 
 ```{r summary}
@@ -123,17 +127,77 @@ cors_amt <- as.vector(cor(train$TARGET_AMT, train[,1:ncol(train)], use = "comple
 NAs <- sapply(train, function(y) sum(length(which(is.na(y)))))
 
 datasummary <- data.frame(means, medians, IQRs, skews, cors_flag, cors_amt, NAs)
-colnames(datasummary) <- c("MEAN", "MEDIAN", "IQR", "SKEW", "$COR_{F}$", "$COR_{A}$", "NAs")
+colnames(datasummary) <- c("MEAN", "MEDIAN", "IQR", "SKEW", "$r_{FLAG}$", "$r_{AMT}$", "NAs")
 datasummary <- round(datasummary, 2)
 pander(datasummary)
 ```
 
+From the table above, it is clear that there are four variables with missing values, with the proportion of values missing ranging from less than < 0.1% to roughly 6.2%; these missing values will need to either be imputed or excluded from the dataset before modeling.  The variables exhibit varying levels of skewness, with a few extreme values.
+
+The large number of binary variables in the dataset makes graphical visualization of the distribution of all variables not particularly useful.  The proportion of binary variables having a value of 0 or 1 is presented in the table below:
+
+\pagebreak
+
+```{r binary-tables}
+binaries <- train %>% dplyr::select(-c(TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, CAR_AGE))
+
+binarytable <- t(sapply(binaries, table)/nrow(binaries))
+binarytable <- round(binarytable, 2)
+pander(binarytable)
+```
+
+The remaining variables are vizualized below in boxplots:
+
+```{r box_plots, fig.height=6}
+non_binary <- train %>% dplyr::select(c(TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, CAR_AGE))
+non_binary <- melt(non_binary)
+ggplot(non_binary, aes(variable, value)) + geom_boxplot(aes(fill = variable), alpha = 0.75, show.legend = FALSE) + facet_wrap(~variable, scale="free") + scale_y_continuous('') + scale_x_discrete('', breaks = NULL) + ggtitle("Distribution of Predictor and Target Variables\n")
+```
+
+The boxplots illustrate the high skewness of the distributions of the predictors `KIDSDRIV`, `INCOME`, `HOME_VAL`, `TRAVTIME`, `BLUEBOOK`, `TIF`, `OLDCLAIM` and `MVR_PTS`.  The target `TARGET_AMT` is also highly skewed -- this makes sense, as this value is 0 for any customers without claims.  Density plots of these variables are presented below:
+
+```{r density-plots}
+skewed <- train %>% dplyr::select(c(TARGET_AMT, KIDSDRIV, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, MVR_PTS))
+skewed <- melt(skewed)
+ggplot(skewed, aes(value)) + geom_density(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free") + scale_y_continuous('', breaks = NULL) + scale_x_continuous('', breaks = NULL) + ggtitle("Density of Skewed Variables\n")
+```
+
+Since `TARGET_AMT` and `OLDCLAIM` have such high concentrations at values of zero, separate plots for these two variables are created with values of zero removed:
+
+```{r claim-density, fig.height=3}
+ggplot(subset(skewed, (variable == "TARGET_AMT" & value != 0) | (variable == "OLDCLAIM" & value !=0)), aes(value)) + geom_density(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale = "free") + scale_y_continuous('', breaks = NULL) + scale_x_continuous('') + ggtitle("Density of Non-Zero Claim Amounts\n")
+```
+
+The 8 predictors with the highest correlation to `TARGET_FLAG` and the 8 predictors with the highest correlation to `TARGET_AMT` share 7 predictors.  The correlation between these variables is investigated and plotted below:
+
+```{r predictor-pairs, fig.height=7, fig.width=7}
+pairs(~MVR_PTS+CLM_FREQ+URBANICITY+HOME_VAL+PARENT1+CAR_USE+OLDCLAIM, data=train, main="Predictors with High Correlattions to Targets", col="slategrey")
+```
+
+There appears to be evidence of possible multicollinearity between `HOME_VAL` and `OLDCLAIM`.
+
+Finally, boxplots are also prepared for non-binary variables split by `TARGET_FLAG`:
+
+```{r boxplot_by_target, fig.height=6}
+numeric <- train %>% dplyr::select(c(TARGET_FLAG, TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, CAR_AGE))
+
+numeric <- melt(numeric, id.vars="TARGET_FLAG")
+numeric$TARGET_FLAG <- factor(numeric$TARGET_FLAG)
+ggplot(numeric, aes(TARGET_FLAG, value)) + geom_boxplot(aes(fill = TARGET_FLAG), alpha = 0.5) + facet_wrap(~variable, scale="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by TARGET_FLAG\n")
+```
+
+Interestingly, there is not an immediately visible difference in median value based on `TARGET_FLAG` values, while the range of predictor values for each flag value differs noticeably.
 
 # Data Preparation
 
 
 
 # Model Creation
+
+## Multiple Linear Regression
+
+
+## Binary Logistic Regression
 
 
 
@@ -145,7 +209,7 @@ pander(datasummary)
 
 \newpage 
 
-#Appendix A: Index-wise Results from Predictive Model
+# Appendix A: Index-wise Results from Predictive Model {-}
 ```{r appendix-a, eval=FALSE}
 appendixA = data.frame(matrix(NA, nrow = 2141, ncol = 4))
 
@@ -157,7 +221,7 @@ pander(appendixA)
 
 \newpage
 
-#Appendix B: R Code
+# Appendix B: R Code {-}
 
 ```{r appendix-b, eval=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
