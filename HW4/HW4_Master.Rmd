@@ -1,0 +1,164 @@
+---
+title: "Homework #4: Insurance Claim Prediction"
+subtitle: "Data 621 Business Analytics and Data Mining"
+author: "Aadi Kalloo, Nathan Lim, Asher Meyers, Daniel Smilowitz, Logan Thomson"
+date: "Due July 10, 2016"
+output: 
+  pdf_document: 
+    toc: yes
+geometry: margin=0.5in
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, comment=NA, fig.align='center')
+
+library(stringr) #For string functions
+library(glmnet) #For binary logistic regression
+library(leaps) #For best subsets
+library(pROC) #For ROC curve
+library(car)
+library(MASS)
+library(ROCR)
+library(ggplot2)
+library(stringr)
+library(dplyr)
+library(reshape)
+library(glmnet)
+library(leaps)
+library(pROC)
+library(MASS)
+library(ggplot2)
+library(vcd)
+library(pander)
+library(tidyr)
+library(e1071)
+
+train <- read.csv("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv")
+```
+
+
+# Data Exploration
+The dataset of interest contains information about customers of an auto insurance company.  The dataset has 8161 rows (each representing a customer) and 25 variables.  There are 23 predictor variables and 2 response variables: `TARGET_FLAG`, a binary categorical variable representing whether each customer has been in an accident; and `TARGET_AMT`, a numerical variable indicating the cost of a crash that a customer was in.  The class of variables read in from the dataset is presented below:
+
+```{r data-class}
+var_class <- data.frame(Class = rep(NA, ncol(train) - 1), Levels = rep(NA, ncol(train) - 1), stringsAsFactors = FALSE, check.names = FALSE, row.names = names(train)[-1])
+for(i in 2:ncol(train)) {
+  var_class[i - 1, 1] <- class(train[, i])
+  var_class[i - 1, 2] <- ifelse(length(levels(train[, i])) == 0, '-', length(levels(train[, i])))
+}
+pander(var_class)
+```
+
+The very high number of levels for four of the variables (`INCOME`, `HOME_VAL`, `BLUEBOOK`, and `OLDCLAIM`) indicates that these variables are not in fact factors; investigation of the dataset indicates that these are dollar values interpreted as strings due to the presence of dollar signs and commas.  The numerical values are extracted for these variables.
+
+```{r numeric}
+#Remove all $ signs and commas, i.e. from INCOME, HOME_VAL, BLUEBOOK, OLDCLAIM
+train$INCOME <- extract_numeric(train$INCOME)
+train$HOME_VAL <- extract_numeric(train$HOME_VAL)
+train$BLUEBOOK <- extract_numeric(train$BLUEBOOK)
+train$OLDCLAIM <- extract_numeric(train$OLDCLAIM)
+```
+
+Additionally, there are 7 variables with only two levels.  These are recast as binary variables as follows:
+
+  * `PARENT1`, `MSTATUS`, `RED_CAR`, and `REVOKED`: using 1 to indicate Yes
+  * `SEX`: using 1 to indicate Male
+  * `CAR_USE`: using 1 to indicate Commercial
+  * `URBANICITY`: using 1 to indicate Highly Urban/ Urban
+
+Finally, there are three categorical variables -- factors with more than two levels.  Dummy variables are created for each of these, as follows:
+
+  * `EDUCATION`: using High School as the base case
+  * `CAR_TYPE`: using Minivan as the base case
+  * `JOB`: using the blank value as the base case
+
+```{r binary-dummy}
+#Convert indicator variables to 0s and 1s; 1 = Yes, Male for Sex, Commercial for Car Use, Red for RED_CAR, and Highly Urban for URBANICITY
+train$PARENT1 <- ifelse(train$PARENT1=="Yes", 1, 0)
+train$MSTATUS <- ifelse(train$MSTATUS=="Yes", 1, 0)
+train$SEX <- ifelse(train$SEX=="M", 1, 0)
+train$CAR_USE <- ifelse(train$CAR_USE=="Commercial", 1, 0)
+train$RED_CAR <- ifelse(train$RED_CAR=="yes", 1, 0)
+train$REVOKED <- ifelse(train$REVOKED=="Yes", 1, 0)
+train$URBANICITY <- ifelse(train$URBANICITY == "Highly Urban/ Urban", 1, 0)
+
+#Convert categorical predictor values to indicator variables - EDUCATION, CAR_TYPE, JOB
+
+#EDUCATION, High school graduate is base case
+train$HSDropout <- ifelse(train$EDUCATION=="<High School", 1, 0)
+train$Bachelors <- ifelse(train$EDUCATION=="Bachelors", 1, 0)
+train$Masters <- ifelse(train$EDUCATION=="Masters", 1, 0)
+train$PhD <- ifelse(train$EDUCATION=="PhD", 1, 0)
+
+#CAR_TYPE, base case is minivan
+train$Panel_Truck <- ifelse(train$CAR_TYPE=="Panel Truck", 1, 0)
+train$Pickup <- ifelse(train$CAR_TYPE=="Pickup", 1, 0)
+train$Sports_Car <- ifelse(train$CAR_TYPE=="Sports Car", 1, 0)
+train$Van <- ifelse(train$CAR_TYPE=="Van", 1, 0)
+train$SUV <- ifelse(train$CAR_TYPE=="z_SUV", 1, 0)
+
+#JOB, base case is ""
+train$Professional <- ifelse(train$JOB == "Professional", 1, 0)
+train$Blue_Collar <- ifelse(train$JOB == "Professional", 1, 0)
+train$Clerical <- ifelse(train$JOB == "Clerical", 1, 0)
+train$Doctor <- ifelse(train$JOB == "Doctor", 1, 0)
+train$Lawyer <- ifelse(train$JOB == "Lawyer", 1, 0)
+train$Manager <- ifelse(train$JOB == "Manager", 1, 0)
+train$Home_Maker <- ifelse(train$JOB == "Home Maker", 1, 0)
+train$Student <- ifelse(train$JOB == "Student", 1, 0)
+
+train <- train %>% dplyr::select(-c(INDEX,EDUCATION,CAR_TYPE,JOB))
+```
+
+A summary of each variable is presented below:
+
+```{r summary}
+means <- sapply(train, function(y) mean(y, na.rm = TRUE))
+medians <- sapply(train, function(y) median(y, na.rm = TRUE))
+IQRs <- sapply(train, function(y) IQR(y, na.rm = TRUE))
+skews <- sapply(train, function(y) skewness(y, na.rm = TRUE))
+cors_flag <- as.vector(cor(train$TARGET_FLAG, train[,1:ncol(train)], use = "complete.obs"))
+cors_amt <- as.vector(cor(train$TARGET_AMT, train[,1:ncol(train)], use = "complete.obs"))
+NAs <- sapply(train, function(y) sum(length(which(is.na(y)))))
+
+datasummary <- data.frame(means, medians, IQRs, skews, cors_flag, cors_amt, NAs)
+colnames(datasummary) <- c("MEAN", "MEDIAN", "IQR", "SKEW", "$COR_{F}$", "$COR_{A}$", "NAs")
+datasummary <- round(datasummary, 2)
+pander(datasummary)
+```
+
+
+# Data Preparation
+
+
+
+# Model Creation
+
+
+
+# Model Selection & Prediction
+
+
+
+
+
+\newpage 
+
+#Appendix A: Index-wise Results from Predictive Model
+```{r appendix-a, eval=FALSE}
+appendixA = data.frame(matrix(NA, nrow = 2141, ncol = 4))
+
+
+names(appendixA) = c("Index", "Predicted Probability", "Predicted Classifcation", "Predicted Cost")
+
+pander(appendixA)
+```
+
+\newpage
+
+#Appendix B: R Code
+
+```{r appendix-b, eval=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+
+```

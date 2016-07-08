@@ -76,7 +76,9 @@ train = train_bk
 
 train_flag <- train[,-c(1,3)] #Training dataset with response of crash or no crash
 train_amount <- train[,-c(1,2)] #Training dataset with response of claim amount
+```
 
+```{r}
 glmflag <- glm(TARGET_FLAG ~.-RED_CAR - Blue_Collar, data = train_flag, family = binomial(link='logit'))
 summary(glmflag)
 vif(glmflag) #Check for collinearity, VIF > 10
