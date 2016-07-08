@@ -10,8 +10,8 @@ library(vcd)
 
 
 train <- read.csv("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv")
-train$EDUCATION
-head(train)
+
+str(train)
 summary(train)
 
 
@@ -26,7 +26,16 @@ train$OLDCLAIM <- as.numeric(str_replace_all(train$OLDCLAIM, "[[:punct:]\\$]",""
 # Cast TARGET_FLAG as factor
 train$TARGET_FLAG <- factor(train$TARGET_FLAG)
 
-head(train)
+train$PARENT1 <- ifelse(train$PARENT1=="Yes", 1, 0)
+train$MSTATUS <- ifelse(train$MSTATUS=="Yes", 1, 0)
+train$SEX <- ifelse(train$SEX=="M", 1, 0)
+train$CAR_USE <- ifelse(train$CAR_USE=="Commercial", 1, 0)
+train$RED_CAR <- ifelse(train$RED_CAR=="yes", 1, 0)
+train$REVOKED <- ifelse(train$REVOKED=="Yes", 1, 0)
+train$URBANICITY <- ifelse(train$URBANICITY == "Highly Urban/ Urban", 1, 0)
+
+
+str(train)
 
 numeric_variables <- train %>%
   dplyr::select(-c(PARENT1, MSTATUS, SEX, EDUCATION, JOB, 
@@ -37,6 +46,22 @@ melted_numeric <- melt(numeric_variables, id=c('TARGET_FLAG', 'TARGET_AMT'))
 
 ggplot(melted_numeric, aes(x=TARGET_FLAG, y=value)) + geom_boxplot() + facet_wrap( ~ variable, scales = 'free')
 
+
+# non numeric Mosaic plot
+library(vcd)
+nonnumeric_variables <- train %>%
+  dplyr::select(c(TARGET_FLAG, PARENT1, MSTATUS, SEX, EDUCATION, JOB, 
+                   CAR_USE, CAR_TYPE, RED_CAR, REVOKED, URBANICITY))
+
+# Using for loop to build tables 
+for (i in 1:10) {
+nonnumeric_names = noquote(names(nonnumeric_variables[i+1]))
+
+data=nonnumeric_variables%>%dplyr::select(c(TARGET_FLAG, get(nonnumeric_names)))
+
+mosaic(assign(paste0("table", i), table(data)), shade=TRUE, legend=TRUE)
+
+}
 
 
 #Convert indicator variables to 0s and 1s; 1 = Yes, Male for Sex, Commercial for Car Use, Red for RED_CAR, and Highly Urban for URBANICITY
