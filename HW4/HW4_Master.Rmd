@@ -324,16 +324,16 @@ which.min(reg.summary$cp)
 points(5, reg.summary$cp[5], col="red", cex=2, pch=20)
 ```
 
-```{r linear-cp-log}
-glm_model_bic <- glm(log(TARGET_AMT + 0.01) ~ BLUEBOOK, data = train_amt)
+```{r linear-bic}
+glm_model_bic <- glm(log(TARGET_AMT) ~ BLUEBOOK, data = train_amt)
 pander(summary(glm_model_bic))
-#AIC: 4073.1
+
 ```
 
-```{r linear-cp-log-log}
-glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(BLUEBOOK), data = train_amt)
+```{r linear-cp}
+glm_model_cp <- glm(log(TARGET_AMT + 0.01) ~ MSTATUSz_No + EDUCATIONBachelors + JOBProfessional + BLUEBOOK + MVR_PTS, data = train_amt)
 pander(summary(glm_model_bic_log))
-#AIC: 4065
+
 ```
 
 
