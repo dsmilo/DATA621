@@ -71,9 +71,9 @@ Additionally, there are 7 variables with only two levels.  These are recast as b
 
 Finally, there are three categorical variables -- factors with more than two levels.  Dummy variables are created for each of these, as follows:
 
-  * `EDUCATION`: using High School as the base case
-  * `CAR_TYPE`: using Minivan as the base case
-  * `JOB`: using the blank value as the base case
+  * `EDUCATION`: 5 dummy variables
+  * `CAR_TYPE`: 6 dummy variables
+  * `JOB`: 8 dummy variables
   
 ```{r logistic-dummy}
 #Convert indicator variables to 0s and 1s; 1 = Yes, Male for Sex, Commercial for Car Use, Red for RED_CAR, and Highly Urban for URBANICITY
@@ -87,22 +87,25 @@ train$URBANICITY <- ifelse(train$URBANICITY == "Highly Urban/ Urban", 1, 0)
 
 #Convert categorical predictor values to indicator variables - EDUCATION, CAR_TYPE, JOB
 
-#EDUCATION, High school graduate is base case
+#EDUCATION
 train$HSDropout <- ifelse(train$EDUCATION=="<High School", 1, 0)
+train$HS <- ifelse(train$EDUCATION=="z_High School", 1, 0)
 train$Bachelors <- ifelse(train$EDUCATION=="Bachelors", 1, 0)
 train$Masters <- ifelse(train$EDUCATION=="Masters", 1, 0)
 train$PhD <- ifelse(train$EDUCATION=="PhD", 1, 0)
 
-#CAR_TYPE, base case is minivan
+#CAR_TYPE
+train$Minivan <- ifelse(train$CAR_TYPE=="Minivan", 1, 0)
 train$Panel_Truck <- ifelse(train$CAR_TYPE=="Panel Truck", 1, 0)
 train$Pickup <- ifelse(train$CAR_TYPE=="Pickup", 1, 0)
 train$Sports_Car <- ifelse(train$CAR_TYPE=="Sports Car", 1, 0)
 train$Van <- ifelse(train$CAR_TYPE=="Van", 1, 0)
 train$SUV <- ifelse(train$CAR_TYPE=="z_SUV", 1, 0)
 
-#JOB, base case is ""
+#JOB
+train$Blank_Job <- ifelse(train$JOB == "", 1, 0)
 train$Professional <- ifelse(train$JOB == "Professional", 1, 0)
-train$Blue_Collar <- ifelse(train$JOB == "Professional", 1, 0)
+train$Blue_Collar <- ifelse(train$JOB == "z_Blue Collar", 1, 0)
 train$Clerical <- ifelse(train$JOB == "Clerical", 1, 0)
 train$Doctor <- ifelse(train$JOB == "Doctor", 1, 0)
 train$Lawyer <- ifelse(train$JOB == "Lawyer", 1, 0)
