@@ -274,7 +274,7 @@ plotROC <- function(model, ndata, gtruth) {
 ```{r linear-full-model}
 fullmodel <- glm(TARGET_AMT ~., data = train_amt)
 pander(summary(fullmodel))
-# AIC: 35304
+# AIC: 44678
 ```
 
 
@@ -282,7 +282,7 @@ pander(summary(fullmodel))
 ```{r linear-log-full-model}
 fullmodel_log <- glm(log(TARGET_AMT) ~., data = train_amt)
 pander(summary(fullmodel_log))
-#AIC: 4111.7
+#AIC: 5235.6
 ```
 
 ### Bayesian Information Criteria
@@ -301,13 +301,13 @@ par(mfrow = c(1,1))
 ```{r linear-bic-log}
 glm_model_bic <- glm(log(TARGET_AMT + 0.01) ~ BLUEBOOK, data = train_amt)
 pander(summary(glm_model_bic))
-#AIC: 4073.1
+#AIC: 5196.2
 ```
 
 ```{r linear-bic-log-log}
 glm_model_bic_log <- glm(log(TARGET_AMT) ~ log(BLUEBOOK), data = train_amt)
 pander(summary(glm_model_bic_log))
-#AIC: 4065
+#AIC: 5184.4
 ```
 
 
@@ -321,7 +321,7 @@ plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
 plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
 
 which.min(reg.summary$cp) 
-points(5, reg.summary$cp[5], col="red", cex=2, pch=20)
+points(6, reg.summary$cp[6], col="red", cex=2, pch=20)
 ```
 
 ```{r linear-bic}
@@ -331,9 +331,9 @@ pander(summary(glm_model_bic))
 ```
 
 ```{r linear-cp}
-glm_model_cp <- glm(log(TARGET_AMT + 0.01) ~ MSTATUSz_No + EDUCATIONBachelors + JOBProfessional + BLUEBOOK + MVR_PTS, data = train_amt)
+glm_model_cp <- glm(log(TARGET_AMT + 0.01) ~ MSTATUS + SEX + BLUEBOOK + CLM_FREQ + MVR_PTS + Bachelors, data = train_amt)
 pander(summary(glm_model_bic_log))
-
+# AIC: 5184.4
 ```
 
 
