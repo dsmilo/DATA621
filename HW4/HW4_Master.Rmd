@@ -24,12 +24,7 @@ library(ROCR)
 library(ggplot2)
 library(stringr)
 library(dplyr)
-library(reshape)
-library(glmnet)
-library(leaps)
-library(pROC)
-library(MASS)
-library(ggplot2)
+library(reshape2)
 library(vcd)
 library(pander)
 library(tidyr)
@@ -247,6 +242,7 @@ pander(transforms)
 
 ```{r split-dataset}
 train_flag <- train[,-2] #Training dataset with response of crash or no crash
+
 crash_data = train[which(train$TARGET_FLAG==1),]
 train_amt  <- crash_data[,-1] #Training dataset with response of claim amount
 ```
@@ -270,22 +266,36 @@ plotROC <- function(model, ndata, gtruth) {
 
 ## Multiple Linear Regression
 
-### Full Model
+The second response variable, `TARGET_AMT`, will have a value of 0 for cases that were not flagged as having a car accident (`TARGET_FLAG = 1`), and the cost of the accident otherwise. Since we are not dealing with a two-level categorical response, we will use multiple linear regression models for this variable. The training data has been subset to only include cases that were flagged for a car crash.
+
+### Full Model  
+
+We will start with the full model, including all 38 predictor variables. Median values were imputed into the variables with NAs.
+
 ```{r linear-full-model}
 fullmodel <- glm(TARGET_AMT ~., data = train_amt)
 pander(summary(fullmodel))
 # AIC: 44678
 ```
 
+Less than half (15) of the predictor coefficients are significant under a reasonable $\alpha$ , and 4 are between a 0.05 an 0.1 p-value. The coefficients vary in size, though all of them are quite small, 20 of the coefficients have negative values. Most of the slopes (negative or positive) appear to make sense in predicting the payout if the vehicle was in a crash, such as the value of the bluebook value of the car and vehicle type having a positive relationship with the response variable. 3 of the predictors coefficients were not defined, most likely due to the number of predictors, and some slight correlation with another variable. `PhD` for instance, has a higher correlation to the `Doctor` job variable.  
 
-### Log-Transformed Full Model
+### Log-Transformed Full Model  
+
+As mentioned in the first section, the response variable is quite skewed.  Our second multiple linear regression model uses a log transformation on the `TARGET_AMT` variable allows for a better fit of the full model.  
+
 ```{r linear-log-full-model}
 fullmodel_log <- glm(log(TARGET_AMT) ~., data = train_amt)
 pander(summary(fullmodel_log))
 #AIC: 5235.6
-```
+```  
 
-### Bayesian Information Criteria
+Now, the number of our predictors that are significant (under a .05 $\alpha$) has increased, with 19 coefficients being highly significant. Our AIC has also decreased greatly from 44678 to 5235.6, indicating a better "goodness of fit".  
+
+### Bayesian Information Criteria  
+
+Our third linear regression model uses Bayesian Information Criteria (BIC) to determine the quantity of predictors, as well as specifically which ones to use in the model. For this model and going forward, we will continue to use the log transformation of the response variable as part of the model. 
+
 ```{r linear-bic}
 regfit.full=regsubsets(log(TARGET_AMT) ~., data=train_amt)
 reg.summary <- summary(regfit.full)
@@ -296,13 +306,21 @@ plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="B
 which.min(reg.summary$bic) 
 points(1, reg.summary$bic[1], col="red", cex=2, pch=20)
 par(mfrow = c(1,1))
-```
+```  
+
+Examining the first plot, the model that results in the lowest "bic" includes the intercept and only one predictor.  
+
+Looking at the second plot, the best subset selection using BIC is the Bluebook value predictor. This is the only predictor chosen by the BIC method for all the different models. This makes sense since the biggest factor in determining the cost of a car accident is generally the value of the vehicle (disregarding personal injury or property damage).  In the full model, Bluebook value had the most significant p-value, and a positive coefficient, given the higher the value of the vehicle, the higher the cost of the accident.  
 
 ```{r linear-bic-log}
-glm_model_bic <- glm(log(TARGET_AMT + 0.01) ~ BLUEBOOK, data = train_amt)
+glm_model_bic <- glm(log(TARGET_AMT) ~ BLUEBOOK, data = train_amt)
 pander(summary(glm_model_bic))
 #AIC: 5196.2
-```
+```  
+
+Compared to our full models, the lone predictor model chosen by the BIC method results in a lower AIC value of 5196.2.  
+
+Since `BLUEBOOK` has a good amount of skew, we will apply a log transformation on the predictor to see if we can improve the fit of the model:
 
 ```{r linear-bic-log-log}
 glm_model_bic_log <- glm(log(TARGET_AMT) ~ log(BLUEBOOK), data = train_amt)
@@ -310,8 +328,12 @@ pander(summary(glm_model_bic_log))
 #AIC: 5184.4
 ```
 
+The transformation of the bluebook value data makes for a better fit of our model, and the resulting AIC is 5184.4, the lowest value yet.
 
-### Mallow's $C_p$
+### Mallow's $C_p$  
+
+Our next multivariate regression model is created utilizing Mallow's $C_p$, instead of BIC, to determine the number of predictors used for a best fit model.  
+
 ```{r linear-cp}
 regfit.full=regsubsets(log(TARGET_AMT) ~., data=train_amt)
 reg.summary <- summary(regfit.full)
@@ -324,56 +346,89 @@ which.min(reg.summary$cp)
 points(6, reg.summary$cp[6], col="red", cex=2, pch=20)
 ```
 
-```{r linear-bic}
-glm_model_bic <- glm(log(TARGET_AMT) ~ BLUEBOOK, data = train_amt)
-pander(summary(glm_model_bic))
+Similar to the plots for BIC selection, the smaller $C_p$ values correspond with the best-fit model.  Using $C_p$, six predictors result in the lowest "Cp" value, which are `MSTATUS`, `SEX`, `BLUEBOOK`, `CLM_FREQ`, `MVR_PTS`, and `Bachelors`.  These predictors selected by using the $C_p$ method correspond with most of the statistically significant predictors from our log transformed response full model, with only the `SEX` predictor over the 0.05 threshold. 
 
-```
+```{r linear-cp-log}
+glm_model_cp <- glm(log(TARGET_AMT) ~ MSTATUS + SEX + BLUEBOOK + CLM_FREQ + MVR_PTS + Bachelors, data = train_amt)
+pander(summary(glm_model_cp))
+# AIC: 5189.3
+```  
 
-```{r linear-cp}
-glm_model_cp <- glm(log(TARGET_AMT + 0.01) ~ MSTATUS + SEX + BLUEBOOK + CLM_FREQ + MVR_PTS + Bachelors, data = train_amt)
-pander(summary(glm_model_bic_log))
-# AIC: 5184.4
-```
+As with the model created with BIC, the coefficient of the `BLUEBOOK` predictor is highly statistically significant. The other variables chosen by the $C_p$ method vary in size and significance of their coefficients. `MSTATUS` and `MVR_PTS` are below the 0.05 $\alpha$, and the remaining predictors are slightly above it. The relationship of marital status and sex to the cost of the accident may have something to do with the type of vehicles single vs. married people, and men vs. women choose to drive.
 
+This model provides the second-lowest AIC of 5189.3, up slightly from the lone-predictor model chosen by BIC method.  
+
+Using the same thought-process as our BIC selection method, the most significant predictor, `BLUEBOOK` is log transformed, resulting in another slight reduction in AIC to 5177.5.
+
+```{r linear-cp-log-log, eval=FALSE}
+glm_model_cp_log <- glm(log(TARGET_AMT) ~ MSTATUS + SEX + log(BLUEBOOK) + CLM_FREQ + MVR_PTS + Bachelors, data = train_amt)
+pander(summary(glm_model_cp_log))
+# AIC: 5177.5
+```  
+
+###Model 5: Manual Selection  
+
+Lastly, we'll use some intuition to manually select predictors for our model based on what we know about driving habits, and what may logically affect the predicted costs of a car accident. Keeping with the theme of using the `BLUEBOOK` variable, we will use two of the other predictors that were significant in the full model, that may help in determining the cost of a car accident. `CLM_FREQ` and `MVR_PTS` are both good indicators of a persons driving habits, and more careless or reckless drivers may get into accidents with higher costs than a safer or more responsible driver would. Both of these variables appeared in the $C_p$ selected model, but we will only use these and not the `SEX` or `MSTATUS` predictors for a more parsimonious model.
+
+```{r manual-linear-model}
+manual_glm <- (glm(log(TARGET_AMT) ~ log(BLUEBOOK) + CLM_FREQ + MVR_PTS, data=train_amt))
+pander(summary(manual_glm))
+#AIC 5181.5
+```  
+
+The result is a model with a slightly higher AIC value of 5181.1, and two of the three predictors being below a 0.05 $\alpha$. The positive coefficients of `BLUEBOOK` and `MVR_PTS` make sense, and the negative slope on claim frequency (less claims, less costly driving habits) makes sense as well.  
 
 ## Binary Logistic Regression
 
+Because we are attempting to predict two response variables, instead of doing this with one model, two separate models will be created to predict each response variable.  First, we will create models for the `TARGET_FLAG` variable, since this will tell us whether a case was involved in a car accident or not.  Binary logistic regression is used, as the flag variable is a two-level categorical response (0 or 1). 
 
-### Full Model
+### Full Model  
+
+We'll start with a full model, using all predictors and no transformations.
+
 ```{r logistic-full-model}
-#Full Model, with two predictors that appear to be linear combinations removed (RED_CAR and Blue_Collar)
-glmflagfull <- glm(TARGET_FLAG ~.-RED_CAR - Blue_Collar, data = train_flag, family = binomial(link='logit'))
+glmflagfull <- glm(TARGET_FLAG ~ ., data = train_flag, family = binomial(link='logit'))
 pander(summary(glmflagfull))
-pander(vif(glmflagfull)) #Check for collinearity, VIF > 10
+#AIC 7373.6
+
+pander(vif(glmflagfull)) #Check for collinearity, VIF > 10 - take this out.
+
 predglmflagfull <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagfull, train_flag))
+
 #pROC::roc(class ~ logit, data = predglmflagfull, auc = TRUE, plot = TRUE, smooth =  TRUE)
-plotROC(model = glmflagfull, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
+plotROC(model = glmflagfull, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG) 
+```  
 
-glmamountfull <- lm(TARGET_AMT ~.-RED_CAR-Blue_Collar, data = train_amt)
-pander(summary(glmamountfull))
-```
+Because we transformed some of the categorical predictors into two-level categorical variables, we have 38 predictors in model. The coefficients vary quite a bit, and we have 13 predictors that are not significant under any reasonable value of $\alpha$. Many of the predictors with high statistical significance seem reasonable when considering the likelihood of an accident. Number of teen drivers, travel time, car use, claim frequency, driver record, and location all have positive slopes, and have significant p-values. 
 
-### Reduced Model
+The full model has an area under the curve of 0.8136, and an accuracy of 
+
+### Reduced Model  
+
+For our next Binary logistic regression model, predictors classified as non-significant have been removed from the full model. The remaining coefficients of predictors are now all significant with regards to their p-values. As with the full model, the predictors relating to the use of the car, performance of the driver, and location have the greatest effect.  
+ 
 ```{r logistic-reduced-model}
 #Reduced Model with non-significant predictors removed
-glmflagreduced <- update(glmflagfull, .~.-HSDropout-Home_Maker-Professional-Student-HOMEKIDS-CAR_AGE-YOJ-Lawyer-SEX-AGE-Doctor-Clerical)
+
+glmflagreduced <- glm(TARGET_FLAG ~ KIDSDRIV + INCOME + PARENT1 + HOME_VAL + MSTATUS + TRAVTIME + CAR_USE + BLUEBOOK + TIF + OLDCLAIM + CLM_FREQ + REVOKED + MVR_PTS + URBANICITY + Minivan + Sports_Car + Doctor + Manager, data = train_flag, family = binomial(link='logit'))
+
 pander(summary(glmflagreduced))
 
 predglmflagreduced <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagreduced, train_flag))
 #pROC::roc(class ~ logit, data = predglmflagreduced, auc = TRUE, plot = TRUE, smooth =  TRUE)
 plotROC(model = glmflagreduced, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
+```  
 
-glmamountreduced <- update(glmamountfull, .~.-YOJ-AGE-Lawyer-Masters-OLDCLAIM-Home_Maker-Clerical-Bachelors-Professional-HOMEKIDS-HOME_VAL-Panel_Truck-HSDropout-PhD-Student-Doctor-Pickup-Van)
-pander(summary(glmamountreduced))
+The reduced model has an area under the curve of 0.80911, and an accuracy of 
 
-predglmamountreduced <- data.frame("class" = train_amt$TARGET_AMT, "logit" = predict(glmamountreduced, train_amt))
-```
+### Best Subsets  
 
-### Best Subsets
+Our last binary logistic regression model will be created using the `regsubsets` function from the `leaps` R package, which performs model selection for us. Bayesian Information Criterion is used for determining the number of predictors, with 19 determined to be the number resulting in the lowest BIC value.
+
 ```{r logistic-best-subsets}
-#TARGET_FLAG Best subsets of full model, without RED_CAR and Blue_Collar which seem to be linear combinations of other predictors for some reason
-regfit.full <- regsubsets(TARGET_FLAG~.-RED_CAR-Blue_Collar, data = train_flag, nvmax = 35)
+#TARGET_FLAG Best subsets of full model
+
+regfit.full <- regsubsets(TARGET_FLAG ~., data = train_flag, nvmax = 35)
 #pander(summary(regfit.full))
 
 par(mar=c(1,1,1,1))
@@ -381,6 +436,7 @@ par(mfrow = c(1, 2))
 plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
 reg.summary <- summary(regfit.full)
 # reg.summary$bic
+
 plot(reg.summary$bic, xlab = "Number of Predictors", ylab = "BIC", type = "l",
      main = "Best Subset Selection Using BIC")
 minbic <- which.min(reg.summary$bic)
@@ -393,29 +449,15 @@ Model_toEval = paste0("glm(TARGET_FLAG ~ ", paste(var_names, collapse = " + "), 
 
 #bestsubset8 <- glm(TARGET_FLAG ~ paste(var_names, collapse = " + "), data = train_flag, family = binomial(link='logit'))
 
-bestsubset21 = eval(parse(text = Model_toEval))
+bestsubset19 = eval(parse(text = Model_toEval))
 
-pander(summary(bestsubset21))
+pander(summary(bestsubset19))
 #predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(bestsubset21, train_flag[,-1]))
 #pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
 plotROC(model = bestsubset21, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
 ```
 
-### Asher's Models
-```{r logistic-asher-models}
-glmflag <- glm(TARGET_FLAG ~.-RED_CAR - Blue_Collar, data = train_flag, family = binomial(link='logit'))
-pander(summary(glmflag))
-pander(vif(glmflag)) #Check for collinearity, VIF > 10
-
-lmflag <- update(glmflag, .~.-HSDropout-Home_Maker-Professional-Student-AGE-HOMEKIDS-Doctor-Lawyer-CAR_AGE-SEX-YOJ-Clerical)
-pander(summary(lmflag))
-
-predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(lmflag, train_flag)) #Predictions using the lmflag model
-pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
-```
-
-
-
+The best subset model has an area under the curve of 0.8015, and an accuracy of 
 
 # Model Selection & Prediction
 

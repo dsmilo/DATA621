@@ -36,7 +36,7 @@ train <- read.csv("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/D
 \newpage
 
 # Data Exploration
-The dataset of interest contains information about customers of an auto insurance company.  The dataset has 8161 rows (each representing a customer) and 25 variables.  There are 23 predictor variables and 2 response variables: `TARGET_FLAG`, a binary categorical variable representing whether each customer has been in an accident; and `TARGET_AMT`, a numerical variable indicating the cost of a crash that a customer was in.  The class of variables read in from the dataset is presented below:
+The data set of interest contains information about customers of an auto insurance company.  The data set has 8161 rows (each representing a customer) and 25 variables.  There are 23 predictor variables and 2 response variables: `TARGET_FLAG`, a binary categorical variable representing whether each customer has been in an accident; and `TARGET_AMT`, a numerical variable indicating the cost of a crash that a customer was in.  The class of variables read in from the data set is presented below:
 
 ```{r data-class}
 var_class <- data.frame(Class = rep(NA, ncol(train) - 1), Levels = rep(NA, ncol(train) - 1), stringsAsFactors = FALSE, check.names = FALSE, row.names = names(train)[-1])
@@ -47,7 +47,7 @@ for(i in 2:ncol(train)) {
 pander(var_class)
 ```
 
-The very high number of levels for four of the variables (`INCOME`, `HOME_VAL`, `BLUEBOOK`, and `OLDCLAIM`) indicates that these variables are not in fact factors; investigation of the dataset indicates that these are dollar values interpreted as strings due to the presence of dollar signs and commas.  The numerical values are extracted for these variables.
+The very high number of levels for four of the variables (`INCOME`, `HOME_VAL`, `BLUEBOOK`, and `OLDCLAIM`) indicates that these variables are not in fact factors; investigation of the data set indicates that these are dollar values interpreted as strings due to the presence of dollar signs and commas.  The numerical values are extracted for these variables.
 
 ```{r numeric}
 #Remove all $ signs and commas, i.e. from INCOME, HOME_VAL, BLUEBOOK, OLDCLAIM
@@ -109,8 +109,19 @@ train$Manager <- ifelse(train$JOB == "Manager", 1, 0)
 train$Home_Maker <- ifelse(train$JOB == "Home Maker", 1, 0)
 train$Student <- ifelse(train$JOB == "Student", 1, 0)
 
-train <- train %>% dplyr::select(-c(INDEX,EDUCATION,CAR_TYPE,JOB))
+train <- train %>% dplyr::select(-c(INDEX, EDUCATION, CAR_TYPE, JOB))
 ```
+
+  ```{r cat_variables_v2}
+  # Alternative to above
+  
+  train$EDUCATION <- as.numeric(factor(train$EDUCATION, levels = c("<High School", "z_High School", "Bachelors", "Masters", "PhD")))-1
+  train$CAR_TYPE <- as.numeric(factor(train$CAR_TYPE, levels = c("Minivan", "Panel Truck", "Pickup", "Sports Car", "Van", "z_SUV")))-1
+  train$JOB <- as.numeric(factor(train$JOB, levels = c("", "Professional", "z_Blue Collar", "Clerical", "Doctor", "Lawyer", "Manager", "Home Maker", "Student")))-1
+  
+  train <- train %>%
+    select(-INDEX)
+  ```
 
 \pagebreak
 
@@ -131,7 +142,7 @@ datasummary <- round(datasummary, 2)
 pander(datasummary)
 ```
 
-From the table above, it is clear that there are four variables with missing values, with the proportion of values missing ranging from less than < 0.1% to roughly 6.2%; these missing values will need to either be imputed or excluded from the dataset before modeling.  The variables exhibit varying levels of skewness, with a few extreme values.
+From the table above, it is clear that there are four variables with missing values, with the proportion of values missing ranging from less than < 0.1% to roughly 6.2%; these missing values will need to either be imputed or excluded from the data set before modeling.  The variables exhibit varying levels of skewness, with a few extreme values.
 
 The large number of binary variables in the dataset makes graphical visualization of the distribution of all variables not particularly useful.  The proportion of binary variables having a value of 0 or 1 is presented in the table below:
 
@@ -242,10 +253,10 @@ pander(transforms)
 ```  
 
 ```{r split-dataset}
-train_flag <- train[,-2] #Training dataset with response of crash or no crash
+train_flag <- train[ ,-2] #Training dataset with response of crash or no crash
 
-train_amt <- train[train$TARGET_FLAG == 1, ] # need to subset only cases with a crash?? 
-train_amt <- train[,-1] #Training dataset with response of claim amount
+crash_data = train[which(train$TARGET_FLAG==1),]
+train_amt <- crash_data[ ,-1] #Training dataset with response of claim amount
 ```
 
 
@@ -276,81 +287,69 @@ We will start with the full model, including all 38 predictor variables. Median 
 ```{r linear-full-model}
 fullmodel <- glm(TARGET_AMT ~., data = train_amt)
 pander(summary(fullmodel))
-# AIC: 35300, impute median 160657
+# AIC: 44678
 ```
 
-Less than half (17) of the predictor variables are siginificant under a reasonable $\alpha$, and 2 are just under a .1 p-value. The coefficients vary in size, though all of them are quite small, 11 of the coefficients have negative values. Most of the slopes (negative or positive) appear to make sense in predicting the payout if the vehicle was in a crash, such as the value of the bluebook value of the car and vehicle type having a positive relationship with the response variable.   
+Less than half (15) of the predictor coefficients are significant under a reasonable $\alpha$ , and 4 are between a 0.05 an 0.1 p-value. The coefficients vary in size, though all of them are quite small, 20 of the coefficients have negative values. Most of the slopes (negative or positive) appear to make sense in predicting the payout if the vehicle was in a crash, such as the value of the bluebook value of the car and vehicle type having a positive relationship with the response variable. 3 of the predictors coefficients were not defined, most likely due to the number of predictors, and some slight correlation with another variable. `PhD` for instance, has a higher correlation to the `Doctor` job variable.  
 
 ###Model 2: Log-Transformed Full Model  
 
 As mentioned in the first section, the response variable is quite skewed.  Our second multiple linear regression model uses a log transformation on the `TARGET_AMT` variable allows for a better fit of the full model.  
 
 ```{r linear-log-full-model}
-fullmodel_log <- glm(log(TARGET_AMT + 0.01) ~., data = train_amt)
+fullmodel_log <- glm(log(TARGET_AMT) ~., data = train_amt)
 pander(summary(fullmodel_log))
-#AIC: 4108.2, impute median 49512
-
-
-#fullmodel_log1p <- glm(log1p(TARGET_AMT) ~., data = train_amt) #using log1p
-#pander(summary(fullmodel_log1p))
-#impute median, AIC: 42371
+#AIC: 5235.6
 ```  
 
-Now, the majority of our predictors have become significant (under a .05 $\alpha$), with 16 predictors being highly significant. Our AIC has also decreased greatly from 160657 to 49512, indicating a better "goodness of fit".  
+Now, the number of our predictors that are significant (under a .05 $\alpha$) has increased, with 19 coefficients being highly significant. Our AIC has also decreased greatly from 44678 to 5235.6, indicating a better "goodness of fit".  
 
 ###Model 3: Bayesian Information Criteria  
 
 Our third linear regression model uses Bayesian Information Criteria (BIC) to determine the quantity of predictors, as well as specifically which ones to use in the model. For this model and going forward, we will continue to use the log transformation of the response variable as part of the model. 
 
 ```{r linear-bic}
-regfit.full = regsubsets(log(TARGET_AMT + 0.01) ~., data = train_amt)
+regfit.full = regsubsets(log(TARGET_AMT) ~., data = train_amt)
 reg.summary <- summary(regfit.full)
 
 #par(mfrow = c(1,2))
 plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
 plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Best subset Selection using BIC")
 which.min(reg.summary$bic) 
-points(8, reg.summary$bic[8], col="red", cex=2, pch=20) #dot was drawn on point 1, changed to 8
+points(1, reg.summary$bic[1], col="red", cex=2, pch=20)
 #par(mfrow = c(1,1))
 ```  
 
-Examining the first plot, the model that results in the lowest "bic" includes the intercept and eight other predictors. These predictors are `KIDSDRIV`, `INCOME`, `MSTATUS`, `BLUEBOOK`, `REVOKED`, `MVR_PTS`, `URBANICITY`, and `Manager`.  All of these selected variables, with the exception of `MANAGER` were highly significant in our previous model, so this makes sense.  
+Examining the first plot, the model that results in the lowest "bic" includes the intercept and only one predictor.  
 
-Looking at the second plot, the best subset selection using BIC is the eight predictors.
+Looking at the second plot, the best subset selection using BIC is the Bluebook value predictor. This is the only predictor chosen by the BIC method for all the different models. This makes sense since the biggest factor in determining the cost of a car accident is generally the value of the vehicle (disregarding personal injury or property damage).  In the full model, Bluebook value had the most significant p-value, and a positive coefficient, given the higher the value of the vehicle, the higher the cost of the accident.  
 
 ```{r linear-bic-log}
-#need to change models due to difference in datasets
-glm_model_bic <- glm(log(TARGET_AMT + 0.01) ~ KIDSDRIV + INCOME + MSTATUS + BLUEBOOK + REVOKED + MVR_PTS + URBANICITY + Manager, data = train_amt)
 
-#glm_model_bic <- glm(log(TARGET_AMT + 0.01) ~ BLUEBOOK, data = train_amt)
-#AIC: 4073.1, impute med 51470
-
+glm_model_bic <- glm(log(TARGET_AMT) ~ BLUEBOOK, data = train_amt) # take out the + 0.01
 pander(summary(glm_model_bic))
-#AIC: 50074
+#AIC: 5196.2
 ```  
 
-The predictors chosen by the BIC method resulted in a slightly higher AIC, however all of the coefficients of the predictors are statistically significant. Kids driving, having a license revoked, motor vehicle points, and a home or work area in an urban setting have a positive (increase cost) effect on the response variable.  Interestingly, the bluebook value of the car has the least significant coefficient as compared to the other predictors.
+Compared to our full models, the lone predictor model chosen by the BIC method results in a lower AIC value of 5196.2.  
 
-Since all but one of the eight predictors (`MSTATUS`) have a good amount of skew, with `KIDSDRIV`, `REVOKED`, `MVR_PTS`, `URBAN` and `Manager`, we will apply log transformations on the predictors to see if we can improve the fit of the model:
+Since `BLUEBOOK` has a good amount of skew, we will apply a log transformation on the predictor to see if we can improve the fit of the model:
 
 ```{r linear-bic-log-log}
-glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(KIDSDRIV + 0.01) + INCOME + MSTATUS + BLUEBOOK + log(REVOKED + 0.01) + log(MVR_PTS + 0.01) + log1p(URBANICITY) + log(Manager + 0.01), data = train_amt)
-
-#glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(BLUEBOOK), data = train_amt)
-#AIC: 4065, impute med 51457
+glm_model_bic_log <- glm(log(TARGET_AMT) ~ log(BLUEBOOK), data = train_amt)
 
 pander(summary(glm_model_bic_log))
-#AIC: 50162
+#AIC: 5184.4
 ```
 
-All of the coefficients are very statistically significant, but the transformations actually resulted in a slightly higher AIC for the model. 
+The transformation of the bluebook value data makes for a better fit of our model, and the resulting AIC is 5184.4, the lowest value yet.
 
 ###Model 4: Mallow's $C_p$  
 
 Our next multivariate regression model is created utilizing Mallow's $C_p$, instead of BIC, to determine the number of predictors used for a best fit model.  
 
 ```{r linear-cp}
-regfit.full <- regsubsets(log(TARGET_AMT + 0.01) ~., data=train_amt)
+regfit.full <- regsubsets(log(TARGET_AMT) ~., data=train_amt)
 reg.summary <- summary(regfit.full)
 
 # par(mfrow = c(1,2))
@@ -359,83 +358,75 @@ plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Bes
 # par(mfrow = c(1,1))
 
 which.min(reg.summary$cp) 
-points(8, reg.summary$cp[8], col="red", cex=2, pch=20)
+points(6, reg.summary$cp[6], col="red", cex=2, pch=20)
 ```  
 
-Similar to the plots for BIC selection, the smaller $C_p$ values correspond with the best-fit model.  Again, eight predictors result in the lowest value, which are `KIDSDRIV`, `INCOME`, `MSTATUS`, `CAR_USE`, `REVOKED`, `MVR_PTS`, `URBANICITY` and `Manager`; similar predictors chosen by the BIC method.  
+Similar to the plots for BIC selection, the smaller $C_p$ values correspond with the best-fit model.  Using $C_p$, six predictors result in the lowest "Cp" value, which are `MSTATUS`, `SEX`, `BLUEBOOK`, `CLM_FREQ`, `MVR_PTS`, and `Bachelors`.  These predictors selected by using the $C_p$ method correspond with most of the statistically significant predictors from our log transformed response full model, with only the `SEX` predictor over the 0.05 threshold. 
 
 ```{r linear-cp-log}
-glm_model_cp <- glm(log(TARGET_AMT + 0.01) ~ KIDSDRIV + INCOME + MSTATUS + CAR_USE + REVOKED + MVR_PTS + URBANICITY + Manager, data = train_amt)
-
-#glm_model_cp <- glm(log(TARGET_AMT + 0.01) ~ BLUEBOOK, data = train_amt)
-#AIC: 4073.1, impute med 51470
-
+glm_model_cp <- glm(log(TARGET_AMT) ~ MSTATUS + SEX + BLUEBOOK + CLM_FREQ + MVR_PTS + Bachelors, data = train_amt)
 pander(summary(glm_model_cp))
-#AIC: 49906
+# AIC: 5189.3
 ```  
 
-As with the model created with BIC, all of the coeffcients of predictors are statistically significant. Each of the slopes correlate with what we would expect from the variables.  The number of teenagers driving, use of the vehicle, the performance of the driver (revocation and motor vehicle points), and location all lead to higher costs when a vehicle is involved in an accident. 
+As with the model created with BIC, the coefficient of the `BLUEBOOK` predictor is highly statistically significant. The other variables chosen by the $C_p$ method vary in size and significance of their coefficients. `MSTATUS` and `MVR_PTS` are below the 0.05 $\alpha$, and the remaining predictors are slightly above it. The relationship of marital status and sex to the cost of the accident may have something to do with the type of vehicles single vs. married people, and men vs. women choose to drive.
 
-This model provides the second-lowest AIC, but may be the best model for predicting costs when a driver is involved in an accident, due the smaller number of predictors.  
+This model provides the second-lowest AIC of 5189.3, up slightly from the lone-predictor model chosen by BIC method.  
+
+Using the same thought-process as our BIC selection method, the most significant predictor, `BLUEBOOK` is log transformed, resulting in another slight reduction in AIC to 5177.5.
 
 ```{r linear-cp-log-log, eval=FALSE}
-#not used
-
-#glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(BLUEBOOK), data = train_amt)
-#pander(summary(glm_model_bic_log))
-#AIC: 4065, impute med 51457
+glm_model_cp_log <- glm(log(TARGET_AMT) ~ MSTATUS + SEX + log(BLUEBOOK) + CLM_FREQ + MVR_PTS + Bachelors, data = train_amt)
+pander(summary(glm_model_cp_log))
+# AIC: 5177.5
 ```
 
 ###Model 5: Manual Selection  
 
-Lastly, we'll use some intuition to manually select predictors for our model based on what we know about driving habits, and what may logically affect the predicted costs of a car accident. The BIC and $C_p$ methods did not select the bluebook value, which did not have as high of a significance as some of the other predictors in the full model, but we can guess the value of the vehicle would correlate well with the cost of an accident. Driving habits (experience), vehicle use, and location all would make sense as major factors in determining risk from a cost standpoint.  
-
-Keeping with only choosing a small number of predictors, we create a model with `BLUEBOOK` (transformed because of skew), `CAR_USE`, `INCOME`, `URBANICITY`, and `TIF`.
+Lastly, we'll use some intuition to manually select predictors for our model based on what we know about driving habits, and what may logically affect the predicted costs of a car accident. Keeping with the theme of using the `BLUEBOOK` variable, we will use two of the other predictors that were significant in the full model, that may help in determining the cost of a car accident. `CLM_FREQ` and `MVR_PTS` are both good indicators of a persons driving habits, and more careless or reckless drivers may get into accidents with higher costs than a safer or more responsible driver would. Both of these variables appeared in the $C_p$ selected model, but we will only use these and not the `SEX` or `MSTATUS` predictors for a more parsimonious model.
 
 ```{r manual-linear-model}
-
-manual_glm <- (glm(log1p(TARGET_AMT) ~ log(BLUEBOOK) + CAR_USE + INCOME + URBANICITY + TIF, data=train_amt))
+manual_glm <- (glm(log(TARGET_AMT) ~ log(BLUEBOOK) + CLM_FREQ + MVR_PTS, data=train_amt))
 pander(summary(manual_glm))
-#AIC 43301
+#AIC 5181.5
 ```  
 
-The result is a model with the lowest AIC value, and all five predictors being highly signifigant. The bluebook value, income and time in force all have a negative coefficient; the latter two make sense as experience and income (less risk being taken) would logically result in safer driving. The negative coefficient of the Bluebook value may arise from drivers being less reckless with a higher value vehicle, whether a more expensive import, or new car (correlates with income).
+The result is a model with a slightly higher AIC value of 5181.1, and two of the three predictors being below a 0.05 $\alpha$. The positive coefficients of `BLUEBOOK` and `MVR_PTS` make sense, and the negative slope on claim frequency (less claims, less costly driving habits) makes sense as well.
 
 ## Binary Logistic Regression
 
-Because we are attemting to predict two response variables, instead of doing this with one model, two separate models will be created to predict each response variable.  First, we will create models for the `TARGET_FLAG` variable, since this will tell us whether a case was involved in a car accident or not.  Binary logistic regression is used, as the flag variable is a two-level categorical response (0 or 1). 
+Because we are attempting to predict two response variables, instead of doing this with one model, two separate models will be created to predict each response variable.  First, we will create models for the `TARGET_FLAG` variable, since this will tell us whether a case was involved in a car accident or not.  Binary logistic regression is used, as the flag variable is a two-level categorical response (0 or 1). 
 
 ### Full Model  
 
-We'll start with a full model, using all predictors, and no transformations.
+We'll start with a full model, using all predictors and no transformations.
 
 ```{r logistic-full-model}
 glmflagfull <- glm(TARGET_FLAG ~ ., data = train_flag, family = binomial(link='logit'))
 pander(summary(glmflagfull))
-#AIC 7372.5
+#AIC 7373.6
 
-pander(vif(glmflagfull)) #Check for collinearity, VIF > 10
+pander(vif(glmflagfull)) #Check for collinearity, VIF > 10 - take this out.
 
 predglmflagfull <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagfull, train_flag))
 
 #pROC::roc(class ~ logit, data = predglmflagfull, auc = TRUE, plot = TRUE, smooth =  TRUE)
-plotROC(model = glmflagfull, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG) #0.813457
+plotROC(model = glmflagfull, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG) 
 ```  
 
-Because we transformed some of the categorical predictors into two-level categorical variables, we have 38 predictors in model. The coefficients vary quite a bit, and we have 13 predictors that are not significant under any reasonable value of $\alpha$. Many of the predictors with high statistical significance seem reasonable when considering the liklihood of an accident. Number of teen drivers, travel time, car use, claim frequency, driver record, and location all have positive slopes, and have significant p-values. 
+Because we transformed some of the categorical predictors into two-level categorical variables, we have 38 predictors in model. The coefficients vary quite a bit, and we have 13 predictors that are not significant under any reasonable value of $\alpha$. Many of the predictors with high statistical significance seem reasonable when considering the likelihood of an accident. Number of teen drivers, travel time, car use, claim frequency, driver record, and location all have positive slopes, and have significant p-values. 
 
 The full model has an area under the curve of 0.8136, and an accuracy of 
 
 ### Reduced Model  
 
-For our next Binary logistic regression model, predictors classified as non-significant have been removed from the full model. The remaining coefficients of predictors are now all significant with regards to their p-values. As with the full model, the predictors relating to the use of the car, perfomance of the driver, and location have the greatest effect.  
+For our next Binary logistic regression model, predictors classified as non-significant have been removed from the full model. The remaining coefficients of predictors are now all significant with regards to their p-values. As with the full model, the predictors relating to the use of the car, performance of the driver, and location have the greatest effect.  
  
 ```{r logistic-reduced-model}
 #Reduced Model with non-significant predictors removed
 
-glmflagreduced <- glm((TARGET_FLAG) ~ . - AGE - HOMEKIDS - YOJ - SEX - RED_CAR - CAR_AGE - HSDropout - PhD - Professional - Lawyer - Home_Maker - Student - Masters - Blue_Collar - Doctor, data = train_flag, family = binomial(link='logit'))
+glmflagreduced <- glm(TARGET_FLAG ~ KIDSDRIV + INCOME + PARENT1 + HOME_VAL + MSTATUS + TRAVTIME + CAR_USE + BLUEBOOK + TIF + OLDCLAIM + CLM_FREQ + REVOKED + MVR_PTS + URBANICITY + Minivan + Sports_Car + Doctor + Manager, data = train_flag, family = binomial(link='logit'))
 
-#glmflagreduced <- update(glmflagfull, #.~.-HSDropout-Home_Maker-Professional-Student-HOMEKIDS-CAR_AGE-YOJ-Lawyer-SEX-AGE-Doctor-Clerical) #why these vars removd
 pander(summary(glmflagreduced))
 
 predglmflagreduced <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagreduced, train_flag))
@@ -443,11 +434,11 @@ predglmflagreduced <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = pre
 plotROC(model = glmflagreduced, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
 ```  
 
-The reduced model has an area under the curve of 0.8111, and an accuracy of 
+The reduced model has an area under the curve of 0.80911, and an accuracy of 
 
 ### Best Subsets  
 
-Our last binary logistic regression model will be created using the `regsubsets` function from the `leaps` R package, which performs model selection for us. Bayesian Information Criterion is used for determining the number of predictors, with 21 determined to be the number resulting in the lowest BIC value.
+Our last binary logistic regression model will be created using the `regsubsets` function from the `leaps` R package, which performs model selection for us. Bayesian Information Criterion is used for determining the number of predictors, with 19 determined to be the number resulting in the lowest BIC value.
 
 ```{r logistic-best-subsets}
 #TARGET_FLAG Best subsets of full model
@@ -473,19 +464,22 @@ Model_toEval = paste0("glm(TARGET_FLAG ~ ", paste(var_names, collapse = " + "), 
 
 #bestsubset8 <- glm(TARGET_FLAG ~ paste(var_names, collapse = " + "), data = train_flag, family = binomial(link='logit'))
 
-bestsubset21 = eval(parse(text = Model_toEval))
+bestsubset19 = eval(parse(text = Model_toEval))
 
-pander(summary(bestsubset21))
+pander(summary(bestsubset19))
 #predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(bestsubset21, train_flag[,-1]))
 #pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
 plotROC(model = bestsubset21, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
 ```
 
-The best subset model has an area under the curve of 0.8116, and an accuracy of 
+The best subset model has an area under the curve of 0.8015, and an accuracy of 
 
 # Model Selection & Prediction
 
+```{r}
+test_df <- read.csv("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance-evaluation-data.csv")
 
+```
 
 
 
