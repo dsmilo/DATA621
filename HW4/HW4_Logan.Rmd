@@ -1,0 +1,509 @@
+---
+title: "Homework #4: Insurance Claim Prediction"
+subtitle: "Data 621 Business Analytics and Data Mining"
+author: "Aadi Kalloo, Nathan Lim, Asher Meyers, Daniel Smilowitz, Logan Thomson"
+date: "Due July 10, 2016"
+output: 
+  pdf_document: 
+    toc: yes
+    number_sections: yes
+geometry: margin=0.5in
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, comment=NA, fig.align='center')
+
+library(stringr) #For string functions
+library(glmnet) #For binary logistic regression
+library(leaps) #For best subsets
+library(pROC) #For ROC curve
+library(car)
+library(MASS)
+library(ROCR)
+library(ggplot2)
+library(stringr)
+library(dplyr)
+library(reshape2) #needs to be changed to reshape2
+library(vcd)
+library(pander)
+library(tidyr)
+library(e1071)
+
+train <- read.csv("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv")
+```
+
+\newpage
+
+# Data Exploration
+The dataset of interest contains information about customers of an auto insurance company.  The dataset has 8161 rows (each representing a customer) and 25 variables.  There are 23 predictor variables and 2 response variables: `TARGET_FLAG`, a binary categorical variable representing whether each customer has been in an accident; and `TARGET_AMT`, a numerical variable indicating the cost of a crash that a customer was in.  The class of variables read in from the dataset is presented below:
+
+```{r data-class}
+var_class <- data.frame(Class = rep(NA, ncol(train) - 1), Levels = rep(NA, ncol(train) - 1), stringsAsFactors = FALSE, check.names = FALSE, row.names = names(train)[-1])
+for(i in 2:ncol(train)) {
+  var_class[i - 1, 1] <- class(train[, i])
+  var_class[i - 1, 2] <- ifelse(length(levels(train[, i])) == 0, '-', length(levels(train[, i])))
+}
+pander(var_class)
+```
+
+The very high number of levels for four of the variables (`INCOME`, `HOME_VAL`, `BLUEBOOK`, and `OLDCLAIM`) indicates that these variables are not in fact factors; investigation of the dataset indicates that these are dollar values interpreted as strings due to the presence of dollar signs and commas.  The numerical values are extracted for these variables.
+
+```{r numeric}
+#Remove all $ signs and commas, i.e. from INCOME, HOME_VAL, BLUEBOOK, OLDCLAIM
+
+train$INCOME <- extract_numeric(train$INCOME)
+train$HOME_VAL <- extract_numeric(train$HOME_VAL)
+train$BLUEBOOK <- extract_numeric(train$BLUEBOOK)
+train$OLDCLAIM <- extract_numeric(train$OLDCLAIM)
+```
+
+Additionally, there are 7 variables with only two levels.  These are recast as binary variables as follows:
+
+  * `PARENT1`, `MSTATUS`, `RED_CAR`, and `REVOKED`: using 1 to indicate Yes
+  * `SEX`: using 1 to indicate Male
+  * `CAR_USE`: using 1 to indicate Commercial
+  * `URBANICITY`: using 1 to indicate Highly Urban/ Urban
+
+Finally, there are three categorical variables -- factors with more than two levels.  Dummy variables are created for each of these, as follows:
+
+  * `EDUCATION`: using High School as the base case
+  * `CAR_TYPE`: using Minivan as the base case
+  * `JOB`: using the blank value as the base case
+  
+```{r logistic-dummy}
+#Convert indicator variables to 0s and 1s; 1 = Yes, Male for Sex, Commercial for Car Use, Red for RED_CAR, and Highly Urban for URBANICITY
+train$PARENT1 <- ifelse(train$PARENT1=="Yes", 1, 0)
+train$MSTATUS <- ifelse(train$MSTATUS=="Yes", 1, 0)
+train$SEX <- ifelse(train$SEX=="M", 1, 0)
+train$CAR_USE <- ifelse(train$CAR_USE=="Commercial", 1, 0)
+train$RED_CAR <- ifelse(train$RED_CAR=="yes", 1, 0)
+train$REVOKED <- ifelse(train$REVOKED=="Yes", 1, 0)
+train$URBANICITY <- ifelse(train$URBANICITY == "Highly Urban/ Urban", 1, 0)
+
+#Convert categorical predictor values to indicator variables - EDUCATION, CAR_TYPE, JOB
+
+#EDUCATION
+train$HSDropout <- ifelse(train$EDUCATION=="<High School", 1, 0)
+train$HS <- ifelse(train$EDUCATION=="z_High School", 1, 0)
+train$Bachelors <- ifelse(train$EDUCATION=="Bachelors", 1, 0)
+train$Masters <- ifelse(train$EDUCATION=="Masters", 1, 0)
+train$PhD <- ifelse(train$EDUCATION=="PhD", 1, 0)
+
+#CAR_TYPE
+train$Minivan <- ifelse(train$CAR_TYPE=="Minivan", 1, 0)
+train$Panel_Truck <- ifelse(train$CAR_TYPE=="Panel Truck", 1, 0)
+train$Pickup <- ifelse(train$CAR_TYPE=="Pickup", 1, 0)
+train$Sports_Car <- ifelse(train$CAR_TYPE=="Sports Car", 1, 0)
+train$Van <- ifelse(train$CAR_TYPE=="Van", 1, 0)
+train$SUV <- ifelse(train$CAR_TYPE=="z_SUV", 1, 0)
+
+#JOB
+train$Blank_Job <- ifelse(train$JOB == "", 1, 0)
+train$Professional <- ifelse(train$JOB == "Professional", 1, 0)
+train$Blue_Collar <- ifelse(train$JOB == "z_Blue Collar", 1, 0)
+train$Clerical <- ifelse(train$JOB == "Clerical", 1, 0)
+train$Doctor <- ifelse(train$JOB == "Doctor", 1, 0)
+train$Lawyer <- ifelse(train$JOB == "Lawyer", 1, 0)
+train$Manager <- ifelse(train$JOB == "Manager", 1, 0)
+train$Home_Maker <- ifelse(train$JOB == "Home Maker", 1, 0)
+train$Student <- ifelse(train$JOB == "Student", 1, 0)
+
+train <- train %>% dplyr::select(-c(INDEX,EDUCATION,CAR_TYPE,JOB))
+```
+
+\pagebreak
+
+A summary of each variable is presented below:
+
+```{r summary}
+means <- sapply(train, function(y) mean(y, na.rm = TRUE))
+medians <- sapply(train, function(y) median(y, na.rm = TRUE))
+IQRs <- sapply(train, function(y) IQR(y, na.rm = TRUE))
+skews <- sapply(train, function(y) skewness(y, na.rm = TRUE))
+cors_flag <- as.vector(cor(train$TARGET_FLAG, train[,1:ncol(train)], use = "complete.obs"))
+cors_amt <- as.vector(cor(train$TARGET_AMT, train[,1:ncol(train)], use = "complete.obs"))
+NAs <- sapply(train, function(y) sum(length(which(is.na(y)))))
+
+datasummary <- data.frame(means, medians, IQRs, skews, cors_flag, cors_amt, NAs)
+colnames(datasummary) <- c("MEAN", "MEDIAN", "IQR", "SKEW", "$r_{FLAG}$", "$r_{AMT}$", "NAs")
+datasummary <- round(datasummary, 2)
+pander(datasummary)
+```
+
+From the table above, it is clear that there are four variables with missing values, with the proportion of values missing ranging from less than < 0.1% to roughly 6.2%; these missing values will need to either be imputed or excluded from the dataset before modeling.  The variables exhibit varying levels of skewness, with a few extreme values.
+
+The large number of binary variables in the dataset makes graphical visualization of the distribution of all variables not particularly useful.  The proportion of binary variables having a value of 0 or 1 is presented in the table below:
+
+\pagebreak
+
+```{r logistic-tables}
+binaries <- train %>% dplyr::select(-c(TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, CAR_AGE))
+
+binarytable <- t(sapply(binaries, table)/nrow(binaries))
+binarytable <- round(binarytable, 2)
+pander(binarytable)
+```
+
+The remaining variables are vizualized below in boxplots:
+
+```{r box_plots, fig.height=6}
+non_binary <- train %>% dplyr::select(c(TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, CAR_AGE))
+non_binary <- melt(non_binary)
+ggplot(non_binary, aes(variable, value)) + geom_boxplot(aes(fill = variable), alpha = 0.75, show.legend = FALSE) + facet_wrap(~variable, scale="free") + scale_y_continuous('') + scale_x_discrete('', breaks = NULL) + ggtitle("Distribution of Predictor and Target Variables\n")
+```
+
+The boxplots illustrate the high skewness of the distributions of the predictors `KIDSDRIV`, `INCOME`, `HOME_VAL`, `TRAVTIME`, `BLUEBOOK`, `TIF`, `OLDCLAIM` and `MVR_PTS`.  The target `TARGET_AMT` is also highly skewed -- this makes sense, as this value is 0 for any customers without claims.  Density plots of these variables are presented below:
+
+```{r density-plots}
+skewed <- train %>% dplyr::select(c(TARGET_AMT, KIDSDRIV, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, MVR_PTS))
+skewed <- melt(skewed)
+ggplot(skewed, aes(value)) + geom_density(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free") + scale_y_continuous('', breaks = NULL) + scale_x_continuous('', breaks = NULL) + ggtitle("Density of Skewed Variables\n")
+```
+
+Since `TARGET_AMT` and `OLDCLAIM` have such high concentrations at values of zero, separate plots for these two variables are created with values of zero removed:
+
+```{r claim-density, fig.height=3}
+ggplot(subset(skewed, (variable == "TARGET_AMT" & value != 0) | (variable == "OLDCLAIM" & value !=0)), aes(value)) + geom_density(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale = "free") + scale_y_continuous('', breaks = NULL) + scale_x_continuous('') + ggtitle("Density of Non-Zero Claim Amounts\n")
+```
+
+The 8 predictors with the highest correlation to `TARGET_FLAG` and the 8 predictors with the highest correlation to `TARGET_AMT` share 7 predictors.  The correlation between these variables is investigated and plotted below:
+
+```{r predictor-pairs, fig.height=7, fig.width=7}
+pairs(~MVR_PTS+CLM_FREQ+URBANICITY+HOME_VAL+PARENT1+CAR_USE+OLDCLAIM, data=train, main="Predictors with High Correlattions to Targets", col="slategrey")
+```
+
+There appears to be evidence of possible multicollinearity between `HOME_VAL` and `OLDCLAIM`.
+
+Finally, boxplots are also prepared for non-binary variables split by `TARGET_FLAG`:
+
+```{r boxplot_by_target, fig.height=6}
+numeric <- train %>% dplyr::select(c(TARGET_FLAG, TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, CAR_AGE))
+
+numeric <- melt(numeric, id.vars="TARGET_FLAG")
+numeric$TARGET_FLAG <- factor(numeric$TARGET_FLAG)
+ggplot(numeric, aes(TARGET_FLAG, value)) + geom_boxplot(aes(fill = TARGET_FLAG), alpha = 0.5) + facet_wrap(~variable, scale="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by TARGET_FLAG\n")
+```
+
+Interestingly, there are only a few variables with immediately visible difference in median value based on `TARGET_FLAG` values, while the range of predictor values for each flag value differs noticeably.
+
+# Data Preparation
+As stated in Part 1, four predictor variables have missing values.  Because these missing values represent, in many cases, a non-menial proportion of the dataset at large, they are imputed so the cases containing missing values can be included in modeling.  Due to the skewness illustrated by some of the variables with missing data (`INCOME` and `HOME_VAL`), the median is used to avoid any bias introduced into the mean by the skewness of these variables' distribution.  For the remaining two variables, the median is also used for imputation for consistency.
+
+Additionally, there is one instance of a vehicle's `CAR_AGE` being -3.  Since this variable represents the age of the car in years, this is a nonsensical value.  This instance of this variable is removed before imputation.
+
+```{r impute-median}
+train$CAR_AGE[train$CAR_AGE == -3] <- NA
+
+fillwithmedian <- function(x) {
+  median_val = median(x, na.rm = TRUE)
+  x[is.na(x)] = median_val
+  return(x)
+}
+
+train <- data.frame(lapply(train, fillwithmedian))
+```
+
+A summary of the variables with imputation of median values is presented below:
+
+\pagebreak
+
+```{r summary-imputed}
+means <- sapply(train, mean)
+medians <- sapply(train, median)
+IQRs <- sapply(train, IQR)
+skews <- sapply(train, skewness)
+cors_flag <- as.vector(cor(train$TARGET_FLAG, train[,1:ncol(train)]))
+cors_amt <- as.vector(cor(train$TARGET_AMT, train[,1:ncol(train)]))
+NAs <- sapply(train, function(y) sum(length(which(is.na(y)))))
+
+imputedsummary <- data.frame(means, medians, IQRs, skews, cors_flag, cors_amt, NAs)
+colnames(imputedsummary) <- c("MEAN", "MEDIAN", "IQR", "SKEW", "$r_{FLAG}$", "$r_{AMT}$", "NAs")
+imputedsummary <- round(imputedsummary, 2)
+pander(imputedsummary)
+```
+
+The creation of additional or combined predictors did not yield any predictors that would improve models, however due to the skewness of some  predictors, log transformations were conducted.
+
+In the table below, we can see the effect of each of the log transformation on the correlations to the two target variables. For many variables, the transformations do not improve the correlation, but the log transformations of `INCOME` and `HOME_VAL` may fit our models better.
+
+\pagebreak
+
+```{r, echo = FALSE}
+# Log tranform -- addition of 0.01 to correct for 0 values yielding NaN
+cors_flag_log <- as.vector(cor(train$TARGET_FLAG, log(train[,1:ncol(train)] + 0.01)))
+cors_amt_log  <- as.vector(cor(train$TARGET_AMT, log(train[,1:ncol(train)] + 0.01)))
+
+transforms <- as.data.frame(cbind(cors_flag, cors_flag_log, cors_amt, cors_amt_log))
+transforms <- round(transforms, 2)
+rownames(transforms) <- colnames(train)
+colnames(transforms) <- c("$r_{FLAG}$", "log $r_{FLAG}$", "$r_{AMT}$", "log $r_{AMT}$")
+pander(transforms)
+```  
+
+```{r split-dataset}
+train_flag <- train[,-2] #Training dataset with response of crash or no crash
+
+train_amt <- train[train$TARGET_FLAG == 1, ] # need to subset only cases with a crash?? 
+train_amt <- train[,-1] #Training dataset with response of claim amount
+```
+
+
+\newpage
+
+# Model Creation
+
+```{r plotROC}
+plotROC <- function(model, ndata, gtruth) {
+  prob <- predict(model, newdata = ndata, type="response")
+  pred <- prediction(prob, gtruth)
+  perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+  auc <- performance(pred, measure = "auc")
+  auc <- auc@y.values[[1]]
+  roc.data <- data.frame(fpr=unlist(perf@x.values), tpr=unlist(perf@y.values), model="GLM")
+  ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) + geom_ribbon(alpha=0.2) + geom_line(aes(y=tpr)) + ggtitle(paste0("ROC Curve w/ AUC=", auc))
+}
+```
+
+## Multiple Linear Regression
+
+The second response variable, `TARGET_AMT`, will have a value of 0 for cases that were not flagged as having a car accident (`TARGET_FLAG = 1`), and the cost of the accident otherwise. Since we are not dealing with a two-level categorical response, we will use multiple linear regression models for this variable. The training data has been subset to only include cases that were flagged for a car crash.
+
+###Model 1: Full Model  
+
+We will start with the full model, including all 38 predictor variables. Median values were imputed into the variables with NAs.
+
+```{r linear-full-model}
+fullmodel <- glm(TARGET_AMT ~., data = train_amt)
+pander(summary(fullmodel))
+# AIC: 35300, impute median 160657
+```
+
+Less than half (17) of the predictor variables are siginificant under a reasonable $\alpha$, and 2 are just under a .1 p-value. The coefficients vary in size, though all of them are quite small, 11 of the coefficients have negative values. Most of the slopes (negative or positive) appear to make sense in predicting the payout if the vehicle was in a crash, such as the value of the bluebook value of the car and vehicle type having a positive relationship with the response variable.   
+
+###Model 2: Log-Transformed Full Model  
+
+As mentioned in the first section, the response variable is quite skewed.  Our second multiple linear regression model uses a log transformation on the `TARGET_AMT` variable allows for a better fit of the full model.  
+
+```{r linear-log-full-model}
+fullmodel_log <- glm(log(TARGET_AMT + 0.01) ~., data = train_amt)
+pander(summary(fullmodel_log))
+#AIC: 4108.2, impute median 49512
+
+
+#fullmodel_log1p <- glm(log1p(TARGET_AMT) ~., data = train_amt) #using log1p
+#pander(summary(fullmodel_log1p))
+#impute median, AIC: 42371
+```  
+
+Now, the majority of our predictors have become significant (under a .05 $\alpha$), with 16 predictors being highly significant. Our AIC has also decreased greatly from 160657 to 49512, indicating a better "goodness of fit".  
+
+###Model 3: Bayesian Information Criteria  
+
+Our third linear regression model uses Bayesian Information Criteria (BIC) to determine the quantity of predictors, as well as specifically which ones to use in the model. For this model and going forward, we will continue to use the log transformation of the response variable as part of the model. 
+
+```{r linear-bic}
+regfit.full = regsubsets(log(TARGET_AMT + 0.01) ~., data = train_amt)
+reg.summary <- summary(regfit.full)
+
+#par(mfrow = c(1,2))
+plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
+plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Best subset Selection using BIC")
+which.min(reg.summary$bic) 
+points(8, reg.summary$bic[8], col="red", cex=2, pch=20) #dot was drawn on point 1, changed to 8
+#par(mfrow = c(1,1))
+```  
+
+Examining the first plot, the model that results in the lowest "bic" includes the intercept and eight other predictors. These predictors are `KIDSDRIV`, `INCOME`, `MSTATUS`, `BLUEBOOK`, `REVOKED`, `MVR_PTS`, `URBANICITY`, and `Manager`.  All of these selected variables, with the exception of `MANAGER` were highly significant in our previous model, so this makes sense.  
+
+Looking at the second plot, the best subset selection using BIC is the eight predictors.
+
+```{r linear-bic-log}
+#need to change models due to difference in datasets
+glm_model_bic <- glm(log(TARGET_AMT + 0.01) ~ KIDSDRIV + INCOME + MSTATUS + BLUEBOOK + REVOKED + MVR_PTS + URBANICITY + Manager, data = train_amt)
+
+#glm_model_bic <- glm(log(TARGET_AMT + 0.01) ~ BLUEBOOK, data = train_amt)
+#AIC: 4073.1, impute med 51470
+
+pander(summary(glm_model_bic))
+#AIC: 50074
+```  
+
+The predictors chosen by the BIC method resulted in a slightly higher AIC, however all of the coefficients of the predictors are statistically significant. Kids driving, having a license revoked, motor vehicle points, and a home or work area in an urban setting have a positive (increase cost) effect on the response variable.  Interestingly, the bluebook value of the car has the least significant coefficient as compared to the other predictors.
+
+Since all but one of the eight predictors (`MSTATUS`) have a good amount of skew, with `KIDSDRIV`, `REVOKED`, `MVR_PTS`, `URBAN` and `Manager`, we will apply log transformations on the predictors to see if we can improve the fit of the model:
+
+```{r linear-bic-log-log}
+glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(KIDSDRIV + 0.01) + INCOME + MSTATUS + BLUEBOOK + log(REVOKED + 0.01) + log(MVR_PTS + 0.01) + log1p(URBANICITY) + log(Manager + 0.01), data = train_amt)
+
+#glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(BLUEBOOK), data = train_amt)
+#AIC: 4065, impute med 51457
+
+pander(summary(glm_model_bic_log))
+#AIC: 50162
+```
+
+All of the coefficients are very statistically significant, but the transformations actually resulted in a slightly higher AIC for the model. 
+
+###Model 4: Mallow's $C_p$  
+
+Our next multivariate regression model is created utilizing Mallow's $C_p$, instead of BIC, to determine the number of predictors used for a best fit model.  
+
+```{r linear-cp}
+regfit.full <- regsubsets(log(TARGET_AMT + 0.01) ~., data=train_amt)
+reg.summary <- summary(regfit.full)
+
+# par(mfrow = c(1,2))
+plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
+plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
+# par(mfrow = c(1,1))
+
+which.min(reg.summary$cp) 
+points(8, reg.summary$cp[8], col="red", cex=2, pch=20)
+```  
+
+Similar to the plots for BIC selection, the smaller $C_p$ values correspond with the best-fit model.  Again, eight predictors result in the lowest value, which are `KIDSDRIV`, `INCOME`, `MSTATUS`, `CAR_USE`, `REVOKED`, `MVR_PTS`, `URBANICITY` and `Manager`; similar predictors chosen by the BIC method.  
+
+```{r linear-cp-log}
+glm_model_cp <- glm(log(TARGET_AMT + 0.01) ~ KIDSDRIV + INCOME + MSTATUS + CAR_USE + REVOKED + MVR_PTS + URBANICITY + Manager, data = train_amt)
+
+#glm_model_cp <- glm(log(TARGET_AMT + 0.01) ~ BLUEBOOK, data = train_amt)
+#AIC: 4073.1, impute med 51470
+
+pander(summary(glm_model_cp))
+#AIC: 49906
+```  
+
+As with the model created with BIC, all of the coeffcients of predictors are statistically significant. Each of the slopes correlate with what we would expect from the variables.  The number of teenagers driving, use of the vehicle, the performance of the driver (revocation and motor vehicle points), and location all lead to higher costs when a vehicle is involved in an accident. 
+
+This model provides the second-lowest AIC, but may be the best model for predicting costs when a driver is involved in an accident, due the smaller number of predictors.  
+
+```{r linear-cp-log-log, eval=FALSE}
+#not used
+
+#glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(BLUEBOOK), data = train_amt)
+#pander(summary(glm_model_bic_log))
+#AIC: 4065, impute med 51457
+```
+
+###Model 5: Manual Selection  
+
+Lastly, we'll use some intuition to manually select predictors for our model based on what we know about driving habits, and what may logically affect the predicted costs of a car accident. The BIC and $C_p$ methods did not select the bluebook value, which did not have as high of a significance as some of the other predictors in the full model, but we can guess the value of the vehicle would correlate well with the cost of an accident. Driving habits (experience), vehicle use, and location all would make sense as major factors in determining risk from a cost standpoint.  
+
+Keeping with only choosing a small number of predictors, we create a model with `BLUEBOOK` (transformed because of skew), `CAR_USE`, `INCOME`, `URBANICITY`, and `TIF`.
+
+```{r manual-linear-model}
+
+manual_glm <- (glm(log1p(TARGET_AMT) ~ log(BLUEBOOK) + CAR_USE + INCOME + URBANICITY + TIF, data=train_amt))
+pander(summary(manual_glm))
+#AIC 43301
+```  
+
+The result is a model with the lowest AIC value, and all five predictors being highly signifigant. The bluebook value, income and time in force all have a negative coefficient; the latter two make sense as experience and income (less risk being taken) would logically result in safer driving. The negative coefficient of the Bluebook value may arise from drivers being less reckless with a higher value vehicle, whether a more expensive import, or new car (correlates with income).
+
+## Binary Logistic Regression
+
+Because we are attemting to predict two response variables, instead of doing this with one model, two separate models will be created to predict each response variable.  First, we will create models for the `TARGET_FLAG` variable, since this will tell us whether a case was involved in a car accident or not.  Binary logistic regression is used, as the flag variable is a two-level categorical response (0 or 1). 
+
+### Full Model  
+
+We'll start with a full model, using all predictors, and no transformations.
+
+```{r logistic-full-model}
+glmflagfull <- glm(TARGET_FLAG ~ ., data = train_flag, family = binomial(link='logit'))
+pander(summary(glmflagfull))
+#AIC 7372.5
+
+pander(vif(glmflagfull)) #Check for collinearity, VIF > 10
+
+predglmflagfull <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagfull, train_flag))
+
+#pROC::roc(class ~ logit, data = predglmflagfull, auc = TRUE, plot = TRUE, smooth =  TRUE)
+plotROC(model = glmflagfull, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG) #0.813457
+```  
+
+Because we transformed some of the categorical predictors into two-level categorical variables, we have 38 predictors in model. The coefficients vary quite a bit, and we have 13 predictors that are not significant under any reasonable value of $\alpha$. Many of the predictors with high statistical significance seem reasonable when considering the liklihood of an accident. Number of teen drivers, travel time, car use, claim frequency, driver record, and location all have positive slopes, and have significant p-values. 
+
+The full model has an area under the curve of 0.8136, and an accuracy of 
+
+### Reduced Model  
+
+For our next Binary logistic regression model, predictors classified as non-significant have been removed from the full model. The remaining coefficients of predictors are now all significant with regards to their p-values. As with the full model, the predictors relating to the use of the car, perfomance of the driver, and location have the greatest effect.  
+ 
+```{r logistic-reduced-model}
+#Reduced Model with non-significant predictors removed
+
+glmflagreduced <- glm((TARGET_FLAG) ~ . - AGE - HOMEKIDS - YOJ - SEX - RED_CAR - CAR_AGE - HSDropout - PhD - Professional - Lawyer - Home_Maker - Student - Masters - Blue_Collar - Doctor, data = train_flag, family = binomial(link='logit'))
+
+#glmflagreduced <- update(glmflagfull, #.~.-HSDropout-Home_Maker-Professional-Student-HOMEKIDS-CAR_AGE-YOJ-Lawyer-SEX-AGE-Doctor-Clerical) #why these vars removd
+pander(summary(glmflagreduced))
+
+predglmflagreduced <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(glmflagreduced, train_flag))
+#pROC::roc(class ~ logit, data = predglmflagreduced, auc = TRUE, plot = TRUE, smooth =  TRUE)
+plotROC(model = glmflagreduced, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
+```  
+
+The reduced model has an area under the curve of 0.8111, and an accuracy of 
+
+### Best Subsets  
+
+Our last binary logistic regression model will be created using the `regsubsets` function from the `leaps` R package, which performs model selection for us. Bayesian Information Criterion is used for determining the number of predictors, with 21 determined to be the number resulting in the lowest BIC value.
+
+```{r logistic-best-subsets}
+#TARGET_FLAG Best subsets of full model
+
+regfit.full <- regsubsets(TARGET_FLAG ~., data = train_flag, nvmax = 35)
+#pander(summary(regfit.full))
+
+par(mar=c(1,1,1,1))
+par(mfrow = c(1, 2))
+plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
+reg.summary <- summary(regfit.full)
+# reg.summary$bic
+
+plot(reg.summary$bic, xlab = "Number of Predictors", ylab = "BIC", type = "l",
+     main = "Best Subset Selection Using BIC")
+minbic <- which.min(reg.summary$bic)
+points(minbic, reg.summary$bic[minbic], col = "brown", cex = 2, pch = 20)
+#coef(regfit.full, minbic)
+var_names = names(coef(regfit.full, minbic))[2:length(names(coef(regfit.full, minbic)))]
+#length(var_names)
+
+Model_toEval = paste0("glm(TARGET_FLAG ~ ", paste(var_names, collapse = " + "), ", data = train_flag, family = binomial(link='logit'))" )
+
+#bestsubset8 <- glm(TARGET_FLAG ~ paste(var_names, collapse = " + "), data = train_flag, family = binomial(link='logit'))
+
+bestsubset21 = eval(parse(text = Model_toEval))
+
+pander(summary(bestsubset21))
+#predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(bestsubset21, train_flag[,-1]))
+#pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
+plotROC(model = bestsubset21, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
+```
+
+The best subset model has an area under the curve of 0.8116, and an accuracy of 
+
+# Model Selection & Prediction
+
+
+
+
+
+\newpage 
+
+# Appendix A: Index-wise Results from Predictive Model {-}
+```{r appendix-a}
+appendixA = data.frame(matrix(NA, nrow = 2141, ncol = 4))
+
+names(appendixA) = c("Index", "Predicted Probability", "Predicted Classifcation", "Predicted Cost")
+
+pander(appendixA)
+```
+
+\newpage
+
+# Appendix B: R Code {-}
+
+```{r appendix-b, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+
+```
