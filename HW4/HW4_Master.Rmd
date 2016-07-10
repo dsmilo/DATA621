@@ -247,7 +247,8 @@ pander(transforms)
 
 ```{r split-dataset}
 train_flag <- train[,-2] #Training dataset with response of crash or no crash
-train_amt  <- train[,-1] #Training dataset with response of claim amount
+crash_data = train[which(train$TARGET_FLAG==1),]
+train_amt  <- crash_data[,-1] #Training dataset with response of claim amount
 ```
 
 
@@ -273,20 +274,20 @@ plotROC <- function(model, ndata, gtruth) {
 ```{r linear-full-model}
 fullmodel <- glm(TARGET_AMT ~., data = train_amt)
 pander(summary(fullmodel))
-# AIC: 35300
+# AIC: 35304
 ```
 
 
 ### Log-Transformed Full Model
 ```{r linear-log-full-model}
-fullmodel_log <- glm(log(TARGET_AMT + 0.01) ~., data = train_amt)
+fullmodel_log <- glm(log(TARGET_AMT) ~., data = train_amt)
 pander(summary(fullmodel_log))
-#AIC: 4108.2
+#AIC: 4111.7
 ```
 
 ### Bayesian Information Criteria
 ```{r linear-bic}
-regfit.full=regsubsets(log(TARGET_AMT + 0.01) ~., data=train_amt)
+regfit.full=regsubsets(log(TARGET_AMT) ~., data=train_amt)
 reg.summary <- summary(regfit.full)
 
 par(mfrow = c(1,2))
@@ -304,7 +305,7 @@ pander(summary(glm_model_bic))
 ```
 
 ```{r linear-bic-log-log}
-glm_model_bic_log <- glm(log(TARGET_AMT + 0.01) ~ log(BLUEBOOK), data = train_amt)
+glm_model_bic_log <- glm(log(TARGET_AMT) ~ log(BLUEBOOK), data = train_amt)
 pander(summary(glm_model_bic_log))
 #AIC: 4065
 ```
@@ -312,16 +313,15 @@ pander(summary(glm_model_bic_log))
 
 ### Mallow's $C_p$
 ```{r linear-cp}
-regfit.full=regsubsets(log(TARGET_AMT + 0.01) ~., data=train_amt)
+regfit.full=regsubsets(log(TARGET_AMT) ~., data=train_amt)
 reg.summary <- summary(regfit.full)
 
 par(mfrow = c(1,2))
 plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
 plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
-par(mfrow = c(1,1))
 
-which.min(reg.summary$bic) 
-points(1, reg.summary$bic[1], col="red", cex=2, pch=20)
+which.min(reg.summary$cp) 
+points(5, reg.summary$cp[5], col="red", cex=2, pch=20)
 ```
 
 ```{r linear-cp-log}

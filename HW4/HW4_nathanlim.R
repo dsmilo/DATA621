@@ -17,29 +17,21 @@ summary(train)
 
 # AGE, YOJ,  INCOME, HOME_VAL, CAR_AGE have NAs
 
+# Cast TARGET_FLAG as factor
+train$TARGET_FLAG <- factor(train$TARGET_FLAG)
+
 #clean money fields.
 train$INCOME <- as.numeric(str_replace_all(train$INCOME, "[[:punct:]\\$]",""))
 train$HOME_VAL <- as.numeric(str_replace_all(train$HOME_VAL, "[[:punct:]\\$]",""))
 train$BLUEBOOK <- as.numeric(str_replace_all(train$BLUEBOOK, "[[:punct:]\\$]",""))
 train$OLDCLAIM <- as.numeric(str_replace_all(train$OLDCLAIM, "[[:punct:]\\$]",""))
 
-# Cast TARGET_FLAG as factor
-train$TARGET_FLAG <- factor(train$TARGET_FLAG)
-
-train$PARENT1 <- ifelse(train$PARENT1=="Yes", 1, 0)
-train$MSTATUS <- ifelse(train$MSTATUS=="Yes", 1, 0)
-train$SEX <- ifelse(train$SEX=="M", 1, 0)
-train$CAR_USE <- ifelse(train$CAR_USE=="Commercial", 1, 0)
-train$RED_CAR <- ifelse(train$RED_CAR=="yes", 1, 0)
-train$REVOKED <- ifelse(train$REVOKED=="Yes", 1, 0)
-train$URBANICITY <- ifelse(train$URBANICITY == "Highly Urban/ Urban", 1, 0)
-
 
 str(train)
 
 numeric_variables <- train %>%
   dplyr::select(-c(PARENT1, MSTATUS, SEX, EDUCATION, JOB, 
-            CAR_USE, CAR_TYPE, RED_CAR, REVOKED, URBANICITY))
+                   CAR_USE, CAR_TYPE, RED_CAR, REVOKED, URBANICITY))
 
 melted_numeric <- melt(numeric_variables, id=c('TARGET_FLAG', 'TARGET_AMT'))
 
@@ -51,27 +43,41 @@ ggplot(melted_numeric, aes(x=TARGET_FLAG, y=value)) + geom_boxplot() + facet_wra
 library(vcd)
 nonnumeric_variables <- train %>%
   dplyr::select(c(TARGET_FLAG, PARENT1, MSTATUS, SEX, EDUCATION, JOB, 
-                   CAR_USE, CAR_TYPE, RED_CAR, REVOKED, URBANICITY))
+                  CAR_USE, CAR_TYPE, RED_CAR, REVOKED, URBANICITY))
 
 # Using for loop to build tables 
 for (i in 1:10) {
-nonnumeric_names = noquote(names(nonnumeric_variables[i+1]))
-
-data=nonnumeric_variables%>%dplyr::select(c(TARGET_FLAG, get(nonnumeric_names)))
-
-mosaic(assign(paste0("table", i), table(data)), shade=TRUE, legend=TRUE)
-
+  nonnumeric_names = noquote(names(nonnumeric_variables[i+1]))
+  
+  data=nonnumeric_variables%>%dplyr::select(c(TARGET_FLAG, get(nonnumeric_names)))
+  
+  mosaic(assign(paste0("table", i), table(data)), shade=TRUE, legend=TRUE)
+  
 }
 
 
-#Convert indicator variables to 0s and 1s; 1 = Yes, Male for Sex, Commercial for Car Use, Red for RED_CAR, and Highly Urban for URBANICITY
+
+
 train$PARENT1 <- ifelse(train$PARENT1=="Yes", 1, 0)
 train$MSTATUS <- ifelse(train$MSTATUS=="Yes", 1, 0)
 train$SEX <- ifelse(train$SEX=="M", 1, 0)
 train$CAR_USE <- ifelse(train$CAR_USE=="Commercial", 1, 0)
-train$RED_CAR <- ifelse(train$RED_CAR=="Yes", 1, 0)
+train$RED_CAR <- ifelse(train$RED_CAR=="yes", 1, 0)
 train$REVOKED <- ifelse(train$REVOKED=="Yes", 1, 0)
 train$URBANICITY <- ifelse(train$URBANICITY == "Highly Urban/ Urban", 1, 0)
+
+str(train)
+
+
+
+fillwithmedian <- function(x) {
+  median_val = median(x, na.rm = TRUE)
+  x[is.na(x)] = median_val
+  return(x)
+}
+
+train = data.frame(lapply(train, fillwithmedian))
+
 
 #Convert categorical predictor values to indicator variables - EDUCATION, CAR_TYPE, JOB
 
@@ -79,24 +85,26 @@ train$URBANICITY <- ifelse(train$URBANICITY == "Highly Urban/ Urban", 1, 0)
 
 train$EDUCATION <- as.numeric(factor(train$EDUCATION, levels = c("<High School", "z_High School", "Bachelors", "Masters", "PhD")))-1
 
+train$CAR_TYPE
 
 #CAR_TYPE, base case is minivan
 train$Panel_Truck <- ifelse(train$CAR_TYPE=="Panel Truck", 1, 0)
 train$Pickup <- ifelse(train$CAR_TYPE=="Pickup", 1, 0)
 train$Sports_Car <- ifelse(train$CAR_TYPE=="Sports Car", 1, 0)
+train$MiniVan <- ifelse(train$CAR_TYPE=="Minivan", 1, 0)
 train$Van <- ifelse(train$CAR_TYPE=="Van", 1, 0)
 train$SUV <- ifelse(train$CAR_TYPE=="z_SUV", 1, 0)
 
 #JOB, base case is ""
 train$Professional <- ifelse(train$JOB == "Professional", 1, 0)
-train$Blue_Collar <- ifelse(train$JOB == "Professional", 1, 0)
+train$Blue_Collar <- ifelse(train$JOB == "z_Blue Collar", 1, 0)
 train$Clerical <- ifelse(train$JOB == "Clerical", 1, 0)
 train$Doctor <- ifelse(train$JOB == "Doctor", 1, 0)
 train$Lawyer <- ifelse(train$JOB == "Lawyer", 1, 0)
 train$Manager <- ifelse(train$JOB == "Manager", 1, 0)
 train$Home_Maker <- ifelse(train$JOB == "Home Maker", 1, 0)
 train$Student <- ifelse(train$JOB == "Student", 1, 0)
-
+train$Others <- ifelse(train$JOB == "", 1, 0)
 
 df <- train %>%
       dplyr::select(-c(INDEX,CAR_TYPE,JOB))
