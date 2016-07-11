@@ -1,0 +1,177 @@
+---
+title: "HW5_nathanlim"
+author: "NathanLim"
+date: "July 11, 2016"
+output: html_document
+---
+```{r}
+library(dplyr)
+library(VIM)
+library(ggplot2)
+library(MASS)
+library(knitr)
+library(faraway)
+library(gridExtra)
+library(caret)
+library(pROC)
+library(grid)
+library(leaps)
+library(caret)
+library(pROC)
+library(grid)
+library(reshape2)
+library(vcd)
+library(glmnet)
+```
+
+
+#Load data
+
+```{r}
+raw_wine_data <- read.csv("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW5/Data/wine-training-data.csv")
+wine_df <- dplyr::select(raw_wine_data, -INDEX)
+```
+
+#Missing values
+
+```{r}
+NA_df <- data.frame(NA_counts = colSums(is.na(wine_df)))
+
+kable(NA_df)
+
+
+df_varHasNA <- dplyr::select(wine_df, -c(TARGET, FixedAcidity, VolatileAcidity, CitricAcid,Density, LabelAppeal, AcidIndex))
+
+aggr(df_varHasNA, prop = TRUE, numbers = TRUE, sortVars = TRUE, cex.lab = 0.4, cex.axis = par("cex"), cex.numbers = par("cex"))
+```
+
+# Check variables
+```{r}
+density_df <- wine_df 
+
+melted <- melt(density_df)
+
+ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Density of Skewed Variables\n")
+```
+
+We can see TARGET, labelAppeal, AcidIndex, STARS are showing poisson distribution.
+
+
+
+#Add variables showing NA 
+
+```{r}
+wine_new <- wine_df
+
+wine_new$ResidualSugar_NA <- factor(ifelse(is.na(wine_df$ResidualSugar), 1, 0))
+wine_new$Chlorides_NA <- factor(ifelse(is.na(wine_df$Chlorides), 1, 0))
+wine_new$FreeSulfurDioxide_NA <- factor(ifelse(is.na(wine_df$FreeSulfurDioxide), 1, 0))
+wine_new$TotalSulfurDioxide_NA <- factor(ifelse(is.na(wine_df$TotalSulfurDioxide), 1, 0))
+wine_new$pH_NA <- factor(ifelse(is.na(wine_df$pH), 1, 0))
+wine_new$Sulphates_NA <- factor(ifelse(is.na(wine_df$Sulphates), 1, 0))
+wine_new$Alcohol_NA <- factor(ifelse(is.na(wine_df$Alcohol), 1, 0))
+wine_new$STARS_NA <- factor(ifelse(is.na(wine_df$STARS), 1, 0))
+
+
+p1 <- ggplot(wine_new, aes(x=ResidualSugar_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.4, size=0.2, col="skyblue") + xlab(colnames(wine_new)[16])
+p2 <- ggplot(wine_new, aes(x=Chlorides_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.4, size=0.2, col="skyblue") + xlab(colnames(wine_new)[17])
+p3 <- ggplot(wine_new, aes(x=FreeSulfurDioxide_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.4, size=0.2, col="skyblue") + xlab(colnames(wine_new)[18])
+p4 <- ggplot(wine_new, aes(x=TotalSulfurDioxide_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.4, size=0.2, col="skyblue") + xlab(colnames(wine_new)[19])
+p5 <- ggplot(wine_new, aes(x=pH_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.4, size=0.2, col="skyblue") + xlab(colnames(wine_new)[20])
+p6 <- ggplot(wine_new, aes(x=Sulphates_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.4, size=0.2, col="skyblue") + xlab(colnames(wine_new)[21])
+p7 <- ggplot(wine_new, aes(x=Alcohol_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.4, size=0.2, col="skyblue") + xlab(colnames(wine_new)[22])
+p8 <- ggplot(wine_new, aes(x=STARS_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.4, size=0.2, col="skyblue") + xlab(colnames(wine_new)[23])
+
+grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8, ncol=2)
+
+```
+When we look at the plots, NAs do not affect the TARGET. However, when STARS is NA, many of TARGET values are zero.
+
+
+```{r}
+df_starsNA=wine_new[which(is.na(wine_new$STARS)==1), ]
+table(df_starsNA$TARGET)
+```
+
+
+# Delete the records including missing value except STARS
+```{r}
+wine_df[which(is.na(wine_df$STARS)), 'STARS'] = 0
+table(wine_df$STARS)
+
+wine_cleaned=data.frame(wine_df[complete.cases(wine_df),])
+str(wine_cleaned)
+```
+
+
+
+
+# Full Model
+
+```{r}
+fullmodel_glm <- glm(TARGET ~., data=wine_cleaned)
+summary(fullmodel_glm)
+
+
+fullmodel_poisson = glm(TARGET ~., data=wine_cleaned, family=poisson)
+summary(fullmodel_poisson)
+```
+
+
+
+#BIC
+```{r}
+regfit.full=regsubsets(TARGET ~., data=wine_cleaned)
+reg.summary <- summary(regfit.full)
+
+par(mfrow=c(1,2))
+plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
+plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Best subset Selection using BIC")
+which.min(reg.summary$bic)
+points(7, reg.summary$bic[7], col="red", cex=2, pch=20)
+reg.summary$bic
+```
+
+When it has 7 variables, the model has the smallest BIC.
+However, bic difference between 4 variable model and 7 variable model is not big. 
+
+
+#Mallow's $C_p$ 
+
+```{r}
+par(mfrow = c(1,2))
+plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
+plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
+
+which.min(reg.summary$cp) 
+points(8, reg.summary$cp[8], col="red", cex=2, pch=20)
+```
+When it has 8 variables, the model has the smallest Cp.
+However, Cp difference between 4 variable model and 8 variable model is not big. 
+
+So we will choose simpler model, 4 variables.
+
+
+#GLM Model
+
+```{r}
+glm_model_bic=glm(TARGET ~ VolatileAcidity+LabelAppeal + AcidIndex + STARS, data=wine_cleaned)
+
+summary(glm_model_bic)
+```
+
+All of the variables are significant and its AIC is 29609
+
+
+
+#Poisson Model
+```{r}
+poisson_model_bic=glm(TARGET ~ VolatileAcidity+LabelAppeal + AcidIndex + STARS, data=wine_cleaned, family=poisson)
+
+summary(poisson_model_bic)
+```
+
+All of the variables are significant and its AIC is 31723
+
+
+
