@@ -29,6 +29,7 @@ library(vcd)
 library(pander)
 library(tidyr)
 library(e1071)
+library(caret)
 
 train <- read.csv("https://raw.githubusercontent.com/dsmilo/DATA621/master/HW4/Data/insurance_training_data.csv")
 ```
@@ -401,7 +402,14 @@ plotROC(model = glmflagfull, ndata = train_flag[, -1], gtruth = train$TARGET_FLA
 
 Because we transformed some of the categorical predictors into two-level categorical variables, we have 38 predictors in model. The coefficients vary quite a bit, and we have 13 predictors that are not significant under any reasonable value of $\alpha$. Many of the predictors with high statistical significance seem reasonable when considering the likelihood of an accident. Number of teen drivers, travel time, car use, claim frequency, driver record, and location all have positive slopes, and have significant p-values. 
 
-The full model has an area under the curve of 0.8136, and an accuracy of 
+```{r full_flag_reduce_run}
+train_flag$predicted_flagfull <- predict(glmflagfull, train_flag, type='response')
+train_flag$target_flagfull <- ifelse(train_flag$predicted_flagfull>0.5, 1, 0)
+
+pander(confusionMatrix(train_flag$TARGET_FLAG, train_flag$target_flagfull, positive = "1")$table)
+```
+
+The full model has an area under the curve of 0.8136, and an accuracy of 0.7927.
 
 ### Reduced Model  
 
@@ -419,7 +427,14 @@ predglmflagreduced <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = pre
 plotROC(model = glmflagreduced, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
 ```  
 
-The reduced model has an area under the curve of 0.80911, and an accuracy of 
+```{r full_flag_model_run}
+train_flag$predicted_flagreduce <- predict(glmflagreduced, train_flag, type='response')
+train_flag$target_flagreduce <- ifelse(train_flag$predicted_flagreduce>0.5, 1, 0)
+
+pander(confusionMatrix(train_flag$TARGET_FLAG, train_flag$target_flagreduce, positive = "1")$table)
+```
+
+The reduced model has an area under the curve of 0.80911, and an accuracy of 0.7930.
 
 ### Best Subsets  
 
@@ -447,6 +462,8 @@ var_names = names(coef(regfit.full, minbic))[2:length(names(coef(regfit.full, mi
 
 Model_toEval = paste0("glm(TARGET_FLAG ~ ", paste(var_names, collapse = " + "), ", data = train_flag, family = binomial(link='logit'))" )
 
+#Model_toEval output "glm(TARGET_FLAG ~ KIDSDRIV + INCOME + PARENT1 + HOME_VAL + MSTATUS + TRAVTIME + CAR_USE + BLUEBOOK + TIF + OLDCLAIM + CLM_FREQ + REVOKED + MVR_PTS + URBANICITY + HSDropout + HS + Panel_Truck + Van + PhD, data = train_flag, family = binomial(link='logit'))"
+
 #bestsubset8 <- glm(TARGET_FLAG ~ paste(var_names, collapse = " + "), data = train_flag, family = binomial(link='logit'))
 
 bestsubset19 = eval(parse(text = Model_toEval))
@@ -455,9 +472,16 @@ pander(summary(bestsubset19))
 #predflag <- data.frame("class" = train_flag$TARGET_FLAG, "logit" = predict(bestsubset21, train_flag[,-1]))
 #pROC::roc(class ~ logit, data = predflag, auc = TRUE, plot = TRUE, smooth =  TRUE)
 plotROC(model = bestsubset21, ndata = train_flag[, -1], gtruth = train$TARGET_FLAG)
+```  
+
+```{r full_flag_reduce_run}
+train_flag$predicted_bestsub <- predict(bestsubset19, train_flag, type='response')
+train_flag$target_bestsub <- ifelse(train_flag$predicted_bestsub > 0.5, 1, 0)
+
+pander(confusionMatrix(train_flag$TARGET_FLAG, train_flag$target_bestsub, positive = "1")$table)
 ```
 
-The best subset model has an area under the curve of 0.8015, and an accuracy of 
+The best subset model has an area under the curve of 0.8015, and an accuracy of 0.7825.
 
 # Model Selection & Prediction
 
