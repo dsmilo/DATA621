@@ -175,3 +175,64 @@ All of the variables are significant and its AIC is 31723
 
 
 
+##10-fold Cross Validation
+```{r, echo = FALSE}
+k = 10
+set.seed(1306)
+folds = sample(1:k, nrow(wine_new), replace = TRUE)
+
+cv.errors1 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors2 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors3 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors4 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors5 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors6 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors7 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors8 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+
+
+for (j in 1:k) {
+  
+  model1 <- glm(TARGET ~ VolatileAcidity+ LabelAppeal + AcidIndex + STARS, data = wine_new[folds != j, ], family =  poisson )
+  model2 = glm(TARGET ~ VolatileAcidity+LabelAppeal + AcidIndex + STARS, data = wine_new[folds != j, ], family =  gaussian )
+
+    for (i in 1:10) {
+      f = wine_new[folds == j, ]
+
+      pred1 = predict(model1, f, id = i)
+      cv.errors1[j, i] = mean((wine_new$TARGET[folds == j] - pred1) ^ 2, na.rm = TRUE)
+
+      pred2 = predict(model2, f, id = i) %>% exp()
+      cv.errors2[j, i] = mean((wine_new$TARGET[folds == j] - pred2) ^ 2, na.rm = TRUE)
+
+  }
+  
+}
+
+
+mean.cv.errors1 <- apply(cv.errors1, 2, mean)
+mean.cv.errors2 <- apply(cv.errors2, 2, mean)
+mean.cv.errors3 <- apply(cv.errors3, 2, mean)
+mean.cv.errors4 <- apply(cv.errors4, 2, mean)
+mean.cv.errors5 <- apply(cv.errors5, 2, mean)
+mean.cv.errors6 <- apply(cv.errors6, 2, mean)
+mean.cv.errors7 <- apply(cv.errors7, 2, mean)
+mean.cv.errors8 <- apply(cv.errors8, 2, mean)
+
+all.cv.error = data.frame(
+mean(mean.cv.errors1),
+mean(mean.cv.errors2),
+mean(mean.cv.errors3),
+mean(mean.cv.errors4), 
+mean(mean.cv.errors5),
+mean(mean.cv.errors6),
+mean(mean.cv.errors7),
+mean(mean.cv.errors8)
+)
+names(all.cv.error) = c("MLR Model 1", "MLR Model 2", "MLR Model 3", "MLR Model 4", "MLR Model 5", "Logistic Model 1", "Logistic Model 2", "Logistic Model 3")
+
+all.cv.error = t(all.cv.error)
+names(all.cv.error) = c("Model", "Mean CV Error")
+
+
+```
