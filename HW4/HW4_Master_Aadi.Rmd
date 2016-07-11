@@ -487,8 +487,30 @@ train_flag$target_bestsub <- ifelse(train_flag$predicted_bestsub > 0.5, 1, 0)
 pander(table(train_flag$TARGET_FLAG, train_flag$target_bestsub))
 ```
 
+\newpage
 
-# Model Selection & Prediction
+# Model Selection & Prediction  
+
+##Model Comparison
+The characteristics and performance of the five multiple linear regression models from the previous section are compared below:
+
+|Model #|# of Predictors|AIC|
+|---|---|---|
+|1|38|44678|
+|2|38|5235.6|
+|3|1|5196.2|
+|3a|1|5184.4|
+|4|6|5189.3|
+|4a|6|5177.5|
+|5|3|5181.1|
+
+The characteristics and performance of the three binary logistic regression models from the previous section are compared below:
+
+|Model #|# of Predictors|AUC|Accuracy|
+|---|---|---|---|
+|1|4|0.8136|0.7927|
+|2|5|0.8091|0.7930|
+|3|4|0.8015|0.7825|
 
 ```{r, echo = FALSE}
 
@@ -669,6 +691,9 @@ predicted_amt2 = predicted_amt
 predicted_amt2[] = 0
 
 
+predicted_flag = predict(model8, test, type = "response")
+predicted_flag_bin = ifelse(predicted_flag > 0.5, 1, 0)
+
 for (i in 1:length(predicted_amt)) {
   if(predicted_flag_bin[i] == 0 | is.na(predicted_flag_bin[i])) {
     predicted_amt2[i] = 0
@@ -678,9 +703,6 @@ for (i in 1:length(predicted_amt)) {
   
 }
 #predicted_wins_bin = ifelse(predicted_wins > 0.5, 1, 0)
-
-predicted_flag = predict(model8, test, type = "response")
-predicted_flag_bin = ifelse(predicted_flag > 0.5, 1, 0)
 ```
 
 #####Predicted Classifications for Test Data, Compared to Training Data
@@ -734,6 +756,6 @@ pander(appendixA)
 
 # Appendix B: R Code {-}
 
-```{r appendix-b, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r appendix-b, echo=TRUE, eval=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
 ```
