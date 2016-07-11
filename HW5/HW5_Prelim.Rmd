@@ -1,0 +1,145 @@
+---
+title: "Data Cleaning"
+author: "Aadi Kalloo"
+date: "July 11, 2016"
+output: html_document
+---
+
+```{r}
+library(ROCR)
+library(leaps)
+library(pander)
+library(stringr)
+
+train = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-training-data.csv")
+test = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-evaluation-data.csv")
+
+```
+
+
+```{r plotROC}
+plotROC <- function(model, ndata, gtruth) {
+  prob <- predict(model, newdata = ndata, type="response")
+  pred <- prediction(prob, gtruth)
+  perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+  auc <- performance(pred, measure = "auc")
+  auc <- auc@y.values[[1]]
+  roc.data <- data.frame(fpr=unlist(perf@x.values), tpr=unlist(perf@y.values), model="GLM")
+  ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) + geom_ribbon(alpha=0.2) + geom_line(aes(y=tpr)) + ggtitle(paste0("ROC Curve w/ AUC=", auc))
+}
+```
+
+
+######Poisson Best Subsets
+```{r}
+
+regfit.full <- regsubsets(TARGET ~ . -INDEX, data=train, nvmax = 16)
+
+par(mfrow = c(1,2))
+
+reg.summary <- summary(regfit.full)
+plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Subset Selection Using BIC")
+BIC_num <- which.min(reg.summary$bic) 
+points(BIC_num, reg.summary$bic[BIC_num], col="red", cex=2, pch=20)
+var_names = names(coef(regfit.full, BIC_num))[2:length(names(coef(regfit.full, BIC_num)))]
+family = "poisson"
+Model_toEval = paste0("glm(TARGET ~ ", paste(var_names, collapse = " + "), paste(", data = train, family = ", family, ")"))
+
+bestsubsets = eval(parse(text = Model_toEval))
+pander(bestsubsets)
+pander(summary(bestsubsets))
+
+#plotROC(model = bestsubsets, ndata = train[, -1], gtruth = train$TARGET)
+plot(regfit.full, scale="bic", main="Predictors vs. BIC")
+par(mfrow = c(1,1))
+```
+
+##10-fold Cross Validation
+```{r, echo = FALSE}
+k = 10
+set.seed(1306)
+folds = sample(1:k, nrow(train), replace = TRUE)
+#folds_amt = sample(1:k, nrow(train_amt), replace = TRUE)
+cv.errors1 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors2 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors3 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors4 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors5 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors6 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors7 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors8 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+
+#train_flag$target = as.numeric(as.character(train_flag$target))
+
+for (j in 1:k) {
+  
+  #model 1 from best subset
+  model1 <- glm(TARGET ~ VolatileAcidity + Alcohol + LabelAppeal + AcidIndex + STARS, data = train[folds != j, ], family =  poisson )
+  model2 = glm(TARGET ~ VolatileAcidity + Alcohol + LabelAppeal + AcidIndex + STARS, data = train[folds != j, ], family =  gaussian )
+  # model2 <- glm(log(TARGET_AMT) ~ log(BLUEBOOK), data = train_amt[folds_amt != j, ])
+  # model3 <- glm(log(TARGET_AMT) ~ MSTATUS + SEX + BLUEBOOK + CLM_FREQ + MVR_PTS + Bachelors, data = train_amt[folds_amt != j, ])
+  # model4 <- glm(log(TARGET_AMT) ~ MSTATUS + SEX + log(BLUEBOOK) + CLM_FREQ + MVR_PTS + Bachelors, data = train_amt[folds_amt != j, ])
+  # model5 <- glm(log(TARGET_AMT) ~ log(BLUEBOOK) + CLM_FREQ + MVR_PTS, data=train_amt[folds_amt != j, ])
+  # model6 <- glm(TARGET_FLAG ~ ., data = train_flag[folds != j, ], family = binomial(link='logit'))
+  # model7 <- glm(TARGET_FLAG ~ KIDSDRIV + INCOME + PARENT1 + HOME_VAL + MSTATUS + TRAVTIME + CAR_USE + BLUEBOOK + TIF + OLDCLAIM + CLM_FREQ + REVOKED + MVR_PTS + URBANICITY + Minivan + Sports_Car + Doctor + Manager, data = train_flag[folds != j, ], family = binomial(link='logit'))
+  # model8 = glm(TARGET_FLAG ~ KIDSDRIV + INCOME + PARENT1 + HOME_VAL + MSTATUS + TRAVTIME + CAR_USE + BLUEBOOK + TIF + OLDCLAIM + CLM_FREQ + REVOKED + MVR_PTS + URBANICITY + HSDropout + HS + Panel_Truck + Van + PhD, data = train_flag[folds != j, ], family = binomial(link='logit'))
+  # 
+  
+    #best.fit = regsubsets(y ~ ., data = train_df[folds != j, ], nvmax = 10)
+    for (i in 1:10) {
+      f = train[folds == j, ]
+      #f = f[complete.cases(f),]
+      pred1 = predict(model1, f, id = i)
+      cv.errors1[j, i] = mean((train$TARGET[folds == j] - pred1) ^ 2, na.rm = TRUE)
+
+      pred2 = predict(model2, f, id = i) %>% exp()
+      cv.errors2[j, i] = mean((train$TARGET[folds == j] - pred2) ^ 2, na.rm = TRUE)
+
+      # pred3 = predict(model3, f, id = i) %>% exp()
+      # cv.errors3[j, i] = mean((train_amt$TARGET_AMT[folds_amt == j] - pred3) ^ 2, na.rm = TRUE)
+      # 
+      # pred4 = predict(model4, f, id = i) %>% exp()
+      # cv.errors4[j, i] = mean((train_amt$TARGET_AMT[folds_amt == j] - pred4) ^ 2, na.rm = TRUE)
+      # 
+      # pred5 = predict(model5, f, id = i) %>% exp()
+      # cv.errors5[j, i] = mean((train_amt$TARGET_AMT[folds_amt == j] - pred5) ^ 2, na.rm = TRUE)      
+      # 
+      # pred6 = predict(model6, train_flag[folds == j, ], id = i)
+      # cv.errors6[j, i] = mean((train_flag$TARGET_FLAG[folds == j] - pred6) ^ 2, na.rm = TRUE)
+      # 
+      # pred7 = predict(model7, train_flag[folds == j, ], id = i)
+      # cv.errors7[j, i] = mean((train_flag$TARGET_FLAG[folds == j] - pred7) ^ 2, na.rm = TRUE)
+      # 
+      # pred8 = predict(model8, train_flag[folds == j, ], id = i)
+      # cv.errors8[j, i] = mean((train_flag$TARGET_FLAG[folds == j] - pred8) ^ 2, na.rm = TRUE)   
+  }
+  
+}
+
+
+mean.cv.errors1 <- apply(cv.errors1, 2, mean)
+mean.cv.errors2 <- apply(cv.errors2, 2, mean)
+mean.cv.errors3 <- apply(cv.errors3, 2, mean)
+mean.cv.errors4 <- apply(cv.errors4, 2, mean)
+mean.cv.errors5 <- apply(cv.errors5, 2, mean)
+mean.cv.errors6 <- apply(cv.errors6, 2, mean)
+mean.cv.errors7 <- apply(cv.errors7, 2, mean)
+mean.cv.errors8 <- apply(cv.errors8, 2, mean)
+
+all.cv.error = data.frame(
+mean(mean.cv.errors1),
+mean(mean.cv.errors2),
+mean(mean.cv.errors3),
+mean(mean.cv.errors4), 
+mean(mean.cv.errors5),
+mean(mean.cv.errors6),
+mean(mean.cv.errors7),
+mean(mean.cv.errors8)
+)
+names(all.cv.error) = c("MLR Model 1", "MLR Model 2", "MLR Model 3", "MLR Model 4", "MLR Model 5", "Logistic Model 1", "Logistic Model 2", "Logistic Model 3")
+#all.cv.error
+all.cv.error = t(all.cv.error)
+names(all.cv.error) = c("Model", "Mean CV Error")
+
+
+```
