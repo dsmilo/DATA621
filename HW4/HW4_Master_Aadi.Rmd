@@ -484,7 +484,7 @@ The best subset model has an area under the curve of 0.8015, and an accuracy of 
 train_flag$predicted_bestsub <- predict(bestsubset19, train_flag, type='response')
 train_flag$target_bestsub <- ifelse(train_flag$predicted_bestsub > 0.5, 1, 0)
 
-pander(confusionMatrix(train_flag$TARGET_FLAG, train_flag$target_bestsub, positive = "1")$table)
+pander(table(train_flag$TARGET_FLAG, train_flag$target_bestsub))
 ```
 
 
@@ -665,6 +665,18 @@ The linear model is applied to a test dataset containing response variables for 
 par(mfrow = c(1, 2), pin = c(2, 2))
 
 predicted_amt <- predict(model1, test)
+predicted_amt2 = predicted_amt
+predicted_amt2[] = 0
+
+
+for (i in 1:length(predicted_amt)) {
+  if(predicted_flag_bin[i] == 0 | is.na(predicted_flag_bin[i])) {
+    predicted_amt2[i] = 0
+  } else {
+    predicted_amt2[i] = predicted_amt[i]
+  }
+  
+}
 #predicted_wins_bin = ifelse(predicted_wins > 0.5, 1, 0)
 
 predicted_flag = predict(model8, test, type = "response")
@@ -680,12 +692,12 @@ pander(table(train_flag$TARGET_FLAG))
 
 #####Predicted Amounts for Test Data, Compared to Training Data
 ```{r, echo = FALSE}
-pander(hist(predicted_amt))
-pander(hist(train$TARGET_AMT))
+hist(predicted_amt2, xlim = range(0, 10000), main = "Predicted Test Distribution")
+hist(train$TARGET_AMT, main = "Training Distribution")
 ```
 
 
-Similar to the training dataset, the predictions for the test data set predictions are weighted more toward crime being below the median. It is important to note that Model 1 did not achieve the highest AIC on the training data but, given its cross-validation performance, we believe that Model 1 will produce the greatest generalizability of the models explored here for prediction of `TARGET_AMOUNT`. Likewise, given the Cross Validation results, we believe that Logistic Model 3 would provide the best generalizability for the classifcation task.
+Similar to the training dataset, the predictions for the test data set predictions are weighted toward zero. It is important to note that Model 1 did not achieve the highest AIC on the training data but, given its cross-validation performance, we believe that Model 1 will produce the greatest generalizability of the models explored here for prediction of `TARGET_AMOUNT`. Likewise, given the Cross Validation results, we believe that Logistic Model 3 would provide the best generalizability for the classifcation task.
 
 A comparison of the full sets of predictions for the evaluation dataset is available in Appendix A.
 
@@ -699,7 +711,21 @@ names(appendixA) = c("Index", "Predicted Probability", "Predicted Classifcation"
 appendixA[,1] = test2$INDEX
 appendixA[,2] = predicted_flag
 appendixA[,3] = predicted_flag_bin
-appendixA[,4] = predicted_amt
+
+predicted_amt2 = predicted_amt
+predicted_amt2[] = 0
+
+
+for (i in 1:length(predicted_amt)) {
+  if(predicted_flag_bin[i] == 0 | is.na(predicted_flag_bin[i])) {
+    predicted_amt2[i] = 0
+  } else {
+    predicted_amt2[i] = predicted_amt[i]
+  }
+  
+}
+
+appendixA[,4] = predicted_amt2
 
 pander(appendixA)
 ```
