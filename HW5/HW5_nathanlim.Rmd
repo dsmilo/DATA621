@@ -155,12 +155,15 @@ So we will choose simpler model, 4 variables.
 #GLM Model
 
 ```{r}
-glm_model_bic=glm(TARGET ~ VolatileAcidity+LabelAppeal + AcidIndex + STARS, data=wine_cleaned)
+glm_model_1=glm(TARGET ~ VolatileAcidity+LabelAppeal + AcidIndex + STARS, data=wine_cleaned, family=gaussian)
 
-summary(glm_model_bic)
+glm_model_2=glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + Alcohol + LabelAppeal + AcidIndex + STARS, data=wine_cleaned, family=gaussian)
+
+summary(glm_model_1) # AIC: 29609
+summary(glm_model_2) # AIC: 29570
 ```
 
-All of the variables are significant and its AIC is 29609
+All of the variables are significant and its AIC is 29609 and 29570
 
 
 
@@ -212,6 +215,10 @@ for (j in 1:k) {
   model4=glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, data=wine_cleaned, family=poisson)
   
   model5=glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + Alcohol + LabelAppeal + AcidIndex + STARS, data=wine_cleaned, family=poisson)
+  
+  model6=glm(TARGET ~ VolatileAcidity+LabelAppeal + AcidIndex + STARS, data=wine_cleaned, family=gaussian)
+
+  model7=glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + Alcohol + LabelAppeal + AcidIndex + STARS, data=wine_cleaned, family=gaussian)
 
     for (i in 1:10) {
       f = wine_new[folds == j, ]
@@ -230,6 +237,12 @@ for (j in 1:k) {
       
       pred5 = predict(model5, f, id = i) %>% exp()
       cv.errors5[j, i] = mean((wine_new$TARGET[folds == j] - pred5) ^ 2, na.rm = TRUE)
+      
+      pred6 = predict(model6, f, id = i) %>% exp()
+      cv.errors6[j, i] = mean((wine_new$TARGET[folds == j] - pred6) ^ 2, na.rm = TRUE)
+      
+      pred7 = predict(model7, f, id = i) %>% exp()
+      cv.errors7[j, i] = mean((wine_new$TARGET[folds == j] - pred7) ^ 2, na.rm = TRUE)
   }
   
 }
@@ -254,7 +267,7 @@ mean(mean.cv.errors6),
 mean(mean.cv.errors7),
 mean(mean.cv.errors8)
 )
-names(all.cv.error) = c("MLR Model 1", "MLR Model 2", "MLR Model 3", "MLR Model 4", "MLR Model 5", "Logistic Model 1", "Logistic Model 2", "Logistic Model 3")
+names(all.cv.error) = c("Possion Model 1", "Possion Model 2", "Possion Model 3", "Possion Model 4", "Possion Model 5", "Linear Model 1", "Linear Model 2", "Negative binomial Model 1", "Negative binomial Model 2")
 
 all.cv.error = t(all.cv.error)
 names(all.cv.error) = c("Model", "Mean CV Error")
