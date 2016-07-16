@@ -1,0 +1,255 @@
+---
+title: "Homework #5: Wine Sales Prediction"
+subtitle: "Data 621 Business Analytics and Data Mining"
+author: "Aadi Kalloo, Nathan Lim, Asher Meyers, Daniel Smilowitz, Logan Thomson"
+date: "Due July 17, 2016"
+output: 
+  pdf_document: 
+    toc: yes
+geometry: margin=0.5in
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, comment=NA, fig.align='center')
+knitr::opts_chunk$set(error = TRUE)
+
+library(dplyr)
+library(VIM)
+library(ggplot2)
+library(MASS)
+#library(faraway)
+library(gridExtra)
+library(caret)
+library(pROC)
+library(grid)
+library(leaps)
+library(reshape2)
+library(vcd)
+library(glmnet)
+library(e1071)
+
+train = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-training-data.csv")
+train <- train[-1] #remove index column
+
+test = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-evaluation-data.csv")
+```
+
+##DATA EXPLORATION
+
+The data set contains 12,795 cases (no pun intended), with an indentification variable (`INDEX`), 14 predictors, and one response variable. Each case is a commerically available wine, with the response variable being the number of cases purchased by restaurants and wine shops after sampling the wine.  Of the 14 predictor variables, 12 are related to chemical preoperties of the wine, while the other two have to do with a rating and label design. 
+
+A summary of each variable is presented below:
+
+```{r summary}
+means <- sapply(train, function(y) mean(y, na.rm = TRUE))
+mins <- sapply(train, function(y) min(y, na.rm=TRUE))
+medians <- sapply(train, function(y) median(y, na.rm = TRUE))
+maxs <- sapply(train, function(y) max(y, na.rm=TRUE))
+IQRs <- sapply(train, function(y) IQR(y, na.rm = TRUE))
+SDs <- sapply(train, function(y) sd(y, na.rm = T))
+skews <- sapply(train, function(y) skewness(y, na.rm = TRUE))
+cors <- as.vector(cor(train$TARGET, train[ , 1:ncol(train)], use = "complete.obs"))
+NAs <- sapply(train, function(y) sum(length(which(is.na(y)))))
+
+datasummary <- data.frame(means, mins, medians, maxs, IQRs, SDs, skews, cors, NAs)
+colnames(datasummary) <- c("MEAN", "MIN","MEDIAN", "MAX", "IQR", "STD. DEV", 
+                           "SKEW", "$r_{TARGET}$", "NAs")
+datasummary <- round(datasummary, 2)
+
+pander(datasummary)
+```  
+
+There are eight variables with missing values, with the proportion of values missing ranging from slightly over 3% to roughly 9.5%; these missing values will need to either be imputed or excluded from the dataset before modeling.  
+
+With the exception of the predictor variables `LabelAppeal`, `AcidIndex`, `STARS`, and our response variable, the remainder of the variables are continuous, and appear to have a fairly normal distribution with a small spread; many of the values are centered around the mean. Due to the size of the dataset, observations outside of 3 sd from the mean do exist. Comparing the means and median, there is very little skew in all of these predictors.   
+
+```{r}
+#Continuous Variables
+
+cont_vars <- train %>% dplyr::select(-c(TARGET, LabelAppeal, AcidIndex, STARS))
+
+melted <- melt(cont_vars)
+
+ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Distribution of Continuous Variables \n")
+```
+
+The other variables are discrete, taking only whole number values, and are therefore binomial distributions.
+
+```{r}
+#Poisson Distributions
+
+poisson_vars <- train %>% dplyr::select(c(TARGET, LabelAppeal, AcidIndex, STARS))
+
+melted <- melt(poisson_vars)
+
+ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Distribution of Discrete Variables \n")
+```
+
+We will revisit the `STARS` variable in the next section, as over 1/4 of the cases contain NAs. It is suspected that these values could be equal to a 0 rating, rather than a missing value.  
+
+
+```{r box_plots, fig.height=6}
+#Boxpots with ggplot2 - not necessary because of histograms?
+
+#m <- melt(train, variable.name="Predictor")
+
+#ggplot(m, aes(Predictor, value)) + geom_boxplot(aes(fill = Predictor), alpha = 0.75, show.legend = FALSE) + facet_wrap(~Predictor, scale="free") + scale_y_continuous('') + scale_x_discrete('', breaks = NULL) + ggtitle("Distribution of Predictor and Target Variables\n")
+```  
+
+Generating boxplots and dividing them up by the response variable, the three variables that show some type of correlation to `TARGET`, `LabelAppeal`, `AcidIndex` and `STARS`, become more apparent. Clearly the effect of bottle aesthetics and ratings of the wine by experts seems to have a greater effect on the decision to purchase the wine or not than any of the chemical properties. The larget majority of wine purchased in higher case numbers (> 4 cases) have higher label likability (`LabelAppeal` is not negative).
+
+```{r}
+density_df2 <- train
+
+melted2 <- melt(density_df, id=1)
+melted2$TARGET <- factor(melted2$TARGET)
+
+ggplot(melted2, aes(TARGET, value)) + geom_boxplot(aes(fill = TARGET), alpha = 0.5) + facet_wrap(~variable, scale="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by TARGET\n")
+```
+
+Number of cases equalling 6 or greater have no "Label Appeal" less than 0.
+
+```{r}
+#Histogram split by STARS
+ggplot(train, aes(TARGET, fill = factor(STARS))) +
+  geom_histogram(binwidth=, position="dodge")
+
+#Histogram split by LabelAppeal
+ggplot(train, aes(TARGET, fill = factor(LabelAppeal))) +
+  geom_histogram(binwidth=.5, position="dodge")
+```  
+
+Other predictors with NAs:
+
+
+
+```{r predictor-pairs, fig.height=7, fig.width=7}
+pairs(~LabelAppeal + AcidIndex + STARS, data=train, main="Predictors with High Correlattions to Targets", col="slategrey")
+```
+
+##DATA PREPARATION  
+
+Before attempting to combine or transform any of our variables, the predictor variables with missing values must be addressed. Eight of the predictor variables have missing values, with almost a third of our cases containing an NA. As concluded from our examination of the data in the previous section, the `STARS` variable has over 3000 NA values, which are most likely associated with a 0 rating. Using this reasoning, we will replace the NA values in `STARS` with zeros. 
+
+```{r stars_repl_NA, echo=FALSE}
+train$STARS[is.na(train$STARS)] <- 0
+```  
+
+```{r}
+#plots to compare differnce after adding zero-values
+```  
+
+Because these missing values represent, in many cases, a non-menial proportion of the dataset at large, they are imputed so the cases containing missing values can be included in modeling.  Due to the skewness illustrated by some of the variables with missing data (`INCOME` and `HOME_VAL`), the median is used to avoid any bias introduced into the mean by the skewness of these variables' distribution.  For the remaining two variables, the median is also used for imputation for consistency.
+
+The remaining variables with NAs, along with the count and proportion of the total cases is found in the table below:
+
+Var Name | No. NAs | % of Cases
+-------- | ------- | ----------  
+ResidualSugar | 616 | 0.048
+Chlorides | 638 | 0.05  
+FreeSulfurDioxide | 647 | 0.051  
+TotalSulfurDioxide | 682 | 0.053 
+pH | 395 | 0.031  
+Sulphates | 1210 | 0.095  
+Alcohol | 653 | 0.051  
+
+```{r row_with_NA, echo=FALSE, eval=FALSE}
+row_has_NA <- apply(train, 1, function(x){any(is.na(x))})
+
+sum(row_has_NA) #6359 rows (just about 1/3) have at least 1 NA before treating for NA
+#4120 rows (nearly 1/3) have at least 1 NA after replacing NA w/0 in STARS
+``` 
+
+With the exception of `Sulphates`, the missing values are approximately 5% or less of the dataset. Even after replacing NAs in the `STARS` variable, nearly one-third of our dataset contains a row with an NA. Even though we have such a large number of observations, deleting such a large quantity of cases may affect the prediction ability of our models. All of these predictors have very little skew; because of this, *the median* will be used to replace the NAs in these respective variables.  
+
+```{r NAs_count_plot}
+df_varHasNA <- train %>% 
+  dplyr::select(-c(TARGET, FixedAcidity, VolatileAcidity, CitricAcid,Density, LabelAppeal, AcidIndex, STARS))
+
+#plot of NA counts
+aggr(df_varHasNA, prop = TRUE, numbers = TRUE, sortVars = TRUE, cex.lab = 0.4, cex.axis = par("cex"), cex.numbers = par("cex"))
+```
+
+
+
+```{r impute-median}
+fillwithmedian <- function(x) {
+  median_val = median(x, na.rm = TRUE)
+  x[is.na(x)] = median_val
+  return(x)
+}
+
+#Save to different objects for mean, median, deleted
+train1 <- data.frame(lapply(train, fillwithmedian))
+```
+
+```{r impute-mean}
+fillwithmean <- function(x) {
+  mean_val = mean(x, na.rm = TRUE)
+  x[is.na(x)] = mean_val
+  return(x)
+}
+
+train2 <- data.frame(lapply(train, fillwithmean))
+```
+
+
+##MODELS
+
+###Models Needed:
+
+-2 Poisson Regression Models
+-2 Negative Binomial Regression
+-2 Mulitple Linear Regression
+-Optional: zero-inflated poisson and/or negative binomial  regression
+
+###Poisson Regression
+
+####Full Model
+```{r}
+summary(glm(TARGET ~ ., family="poisson", data=train))
+```
+
+```{r}
+summary(glm(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, family="poisson", data=train))
+```
+
+```{r}
+summary(glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family="poisson", data=train))
+```  
+
+###Negative Binomial Regression
+
+```{r}
+summary(glm.nb(TARGET ~., data=train))
+```
+
+```{r}
+summary(glm.nb(TARGET ~ log1p(STARS), data=train))
+```  
+
+```{r}
+summary(glm.nb(TARGET ~ LabelAppeal + STARS, data=train))
+```  
+
+###Multiple Linear Regression  
+
+####Full Model
+
+```{r}
+summary(glm(TARGET ~., data=train))
+```
+
+```{r}
+summary(lm(TARGET ~ STARS, data=train))
+
+summary(glm(TARGET ~ STARS, data=train))
+```  
+
+```{r}
+summary(glm(TARGET ~ LabelAppeal + AcidIndex + STARS, data=train))
+```  
+
+##MODEL SELECTION and PREDICTION  
+
