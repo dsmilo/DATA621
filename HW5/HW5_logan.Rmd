@@ -29,6 +29,7 @@ library(vcd)
 library(glmnet)
 library(e1071)
 library(car)
+library(pander)
 
 train = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-training-data.csv")
 train <- train[-1] #remove index column
@@ -371,13 +372,13 @@ for (j in 1:k) {
       cv.errors2[j, i] = mean((train$TARGET[folds == j] - pred2) ^ 2, na.rm = TRUE)
 
       pred3 = predict(model3, f, id = i) 
-      cv.errors3[j, i] = mean((train$TARGET[folds_amt == j] - pred3) ^ 2, na.rm = TRUE)
+      cv.errors3[j, i] = mean((train$TARGET[folds == j] - pred3) ^ 2, na.rm = TRUE)
        
       pred4 = predict(model4, f, id = i) 
-      cv.errors4[j, i] = mean((train$TARGET[folds_amt == j] - pred4) ^ 2, na.rm = TRUE)
+      cv.errors4[j, i] = mean((train$TARGET[folds == j] - pred4) ^ 2, na.rm = TRUE)
        
       pred5 = predict(model5, f, id = i) 
-      cv.errors5[j, i] = mean((train$TARGET[folds_amt == j] - pred5) ^ 2, na.rm = TRUE)      
+      cv.errors5[j, i] = mean((train$TARGET[folds == j] - pred5) ^ 2, na.rm = TRUE)      
        
       pred6 = predict(model6, f, id = i)
       cv.errors6[j, i] = mean((train$TARGET[folds == j] - pred6) ^ 2, na.rm = TRUE)
