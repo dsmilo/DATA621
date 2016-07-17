@@ -103,7 +103,7 @@ Generating boxplots and dividing them up by the response variable, the three var
 ```{r}
 density_df2 <- train
 
-melted2 <- melt(density_df, id=1)
+melted2 <- melt(density_df2, id=1)
 melted2$TARGET <- factor(melted2$TARGET)
 
 ggplot(melted2, aes(TARGET, value)) + geom_boxplot(aes(fill = TARGET), alpha = 0.5) + facet_wrap(~variable, scale="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by TARGET\n")
@@ -207,7 +207,7 @@ Before creating the different models, we will investigate using Bayesian Informa
 First, we will look at predictor selection using Bayesian Information Criteria:  
 
 ```{r bic_selection}
-regfit.full=regsubsets(TARGET ~., data=train)
+regfit.full=regsubsets(TARGET ~., data=train, nvmax = 14)
 reg.summary <- summary(regfit.full)
 
 par(mfrow=c(1,2))
