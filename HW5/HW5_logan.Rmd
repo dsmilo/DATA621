@@ -424,29 +424,33 @@ The linear model is applied to a test dataset containing response variables for 
 par(mfrow = c(1, 2), pin = c(2, 2))
 
 predicted_cases <- predict(model6, test, type='response')
-predicted_cases_bin = ifelse(predicted_cases > 0.5, 1, 0)
+predicted_cases_stars = round(predicted_cases, 0)
 ```
 
-#####Predicted Targets for Test Data
+The predicted ratings are converted to even star values by rounding to the nearest integer.  A table of the proportion of ratings at each star level is presented for both the test and training datasets.
+
 ```{r, echo = FALSE}
-pander(table(predicted_cases_bin))
+table_test <- table(predicted_cases_stars) / length(predicted_cases_stars)
+table_test <- c(0, table_test, 0)
+names(table_test)[1] <- "0"; names(table_test)[9] <- "8"
+table_train <- table(train$TARGET) / length(train$TARGET)
+table_ratings <- rbind(table_test, table_train)
+row.names(table_ratings) <- c("Test", "Train")
+pander(table_ratings, round = 3)
 ```
 
-#####Targets for Training Data
-```{r, echo = FALSE}
-training_cases = train$TARGET
-pander(table(training_cases))
-```
+The full sets of predictions -- both raw predicted values and even star values -- for the evaluation dataset are available in Appendix A.
 
 \newpage
 
 # Appendix A: Index-wise Results from Predictive Model  
 ```{r appendix-a}
-appendixA = data.frame(matrix(NA, nrow = 3335, ncol = 2))
-appendixA[, 1] = c(1:3335)
-appendixA[, 2] = predicted_cases_bin[1:3335]
+appendixA = data.frame(matrix(NA, nrow = 3335, ncol = 3))
+appendixA[, 1] = test$IN
+appendixA[, 2] = predicted_cases
+appendixA[, 3] = predicted_cases_stars
 
-names(appendixA) = c("Index", "Predicted Value", "Index", "Predicted Value")
+names(appendixA) = c("Index", "Predicted Value", "Predicted Star Value")
 
 pander(appendixA)
 ```
