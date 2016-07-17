@@ -242,7 +242,7 @@ First, a full model using poisson regression and all 14 of the predictors is bui
 
 ```{r}
 model0 <- (glm(TARGET ~ ., family="poisson", data=train))
-summary(model0)
+pander(summary(model0))
 #AIC: 31705
 ```
 
@@ -254,7 +254,7 @@ A reduced model is created, using the predictors recommended by using Mallow's $
 
 ```{r}
 model1 <- (glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, family="poisson", data=train))
-summary(model1)
+pander(summary(model1))
 #AIC: 31701
 ```  
 
@@ -264,7 +264,7 @@ For our last poisson regression model, the predictors which were the most signif
 
 ```{r}
 model2 <- (glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family=poisson, data=train))
-summary(model2)
+pander(summary(model2))
 #AIC: 31739
 ```  
 
@@ -284,7 +284,7 @@ For the first negative binomial regression model, the predictors selected using 
 
 ```{r}
 model3 <- (glm.nb(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + Alcohol + AcidIndex + LabelAppeal + STARS, data=train))
-summary(model3)
+pander(summary(model3))
 #AIC 31704
 ```  
 
@@ -294,7 +294,7 @@ For the second negative binomial model, only the predictors with highly signific
 
 ```{r}
 model4 <- (glm.nb(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, data=train))
-summary(model4)
+pander(summary(model4))
 #AIC: 31715
 ```
 
@@ -302,14 +302,14 @@ summary(model4)
 
 ```{r}
 model5 <-(glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train))
-summary(model5)
+pander(summary(model5))
 #AIC: 29584
 ```
 
 
 ```{r}
 model6 <- glm(TARGET ~ VolatileAcidity + FreeSulfurDioxide + TotalSulfurDioxide + Chlorides + Density + pH + Sulphates + LabelAppeal + AcidIndex + STARS, family=gaussian, data = train)
-summary(model6)
+pander(summary(model6))
 #AIC: 29570
 ```  
 
@@ -411,7 +411,7 @@ names(all.cv.error) = c("Model", "Mean CV Error")
 
 ```  
 
-#####Mean CV Error {-}
+#####Mean CV Error
 ```{r cv-error, echo = FALSE}
 pander(all.cv.error)
 ```
@@ -445,12 +445,16 @@ The full sets of predictions -- both raw predicted values and even star values -
 
 # Appendix A: Index-wise Results from Predictive Model  
 ```{r appendix-a}
-appendixA = data.frame(matrix(NA, nrow = 3335, ncol = 3))
-appendixA[, 1] = test$IN
-appendixA[, 2] = predicted_cases
-appendixA[, 3] = predicted_cases_stars
+appendixA = data.frame(matrix(NA, nrow = 1667, ncol = 6))
+appendixA[, 1] = test$IN[1:1667]
+appendixA[, 2] = predicted_cases[1:1667]
+appendixA[, 3] = predicted_cases_stars[1:1667]
+appendixA[, 4] = test$IN[1669:3335]
+appendixA[, 5] = predicted_cases[1669:3335]
+appendixA[, 6] = predicted_cases_stars[1669:3335]
+appendixA <- rbind(appendixA, c(test$IN[1668], predicted_cases[1668], predicted_cases_stars[1688], rep(NA, 3)))
 
-names(appendixA) = c("Index", "Predicted Value", "Predicted Star Value")
+names(appendixA) = rep(c("Index", "Value", "Stars"), 2)
 
 pander(appendixA)
 ```
