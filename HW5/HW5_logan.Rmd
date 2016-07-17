@@ -28,6 +28,7 @@ library(reshape2)
 library(vcd)
 library(glmnet)
 library(e1071)
+library(car)
 
 train = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-training-data.csv")
 train <- train[-1] #remove index column
@@ -142,7 +143,32 @@ sum(row_has_NA) #6359 rows (just about 1/3) have at least 1 NA before treating f
 #4120 rows (nearly 1/3) have at least 1 NA after replacing NA w/0 in STARS
 ``` 
 
-With the exception of `Sulphates`, the missing values are approximately 5% or less of the each of the above variables. After replacing NAs in the `STARS` variable, nearly one-third of our dataset contains a row with an NA. Even though we have such a large number of observations, deleting such a large quantity of cases may affect the prediction ability of our models. All of these predictors have very little skew; because of this, *the median* will be used to replace the NAs in these respective variables.  A visual comparison of the predictor variables and the quantitiy of NAs is below:  
+With the exception of `Sulphates`, the missing values are approximately 5% or less of the each of the above variables. After replacing NAs in the `STARS` variable, nearly one-third of our dataset contains a row with an NA. The plots below show the distribution of the NA values for each of the remaining predictors, which appear to be missing at random.
+
+```{r NA_distribution}
+wine_new <- train
+
+wine_new$ResidualSugar_NA <- factor(ifelse(is.na(train$ResidualSugar), 1, 0))
+wine_new$Chlorides_NA <- factor(ifelse(is.na(train$Chlorides), 1, 0))
+wine_new$FreeSulfurDioxide_NA <- factor(ifelse(is.na(train$FreeSulfurDioxide), 1, 0))
+wine_new$TotalSulfurDioxide_NA <- factor(ifelse(is.na(train$TotalSulfurDioxide), 1, 0))
+wine_new$pH_NA <- factor(ifelse(is.na(train$pH), 1, 0))
+wine_new$Sulphates_NA <- factor(ifelse(is.na(train$Sulphates), 1, 0))
+wine_new$Alcohol_NA <- factor(ifelse(is.na(train$Alcohol), 1, 0))
+
+
+p1 <- ggplot(wine_new, aes(x=ResidualSugar_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[16])
+p2 <- ggplot(wine_new, aes(x=Chlorides_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[17])
+p3 <- ggplot(wine_new, aes(x=FreeSulfurDioxide_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[18])
+p4 <- ggplot(wine_new, aes(x=TotalSulfurDioxide_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[19])
+p5 <- ggplot(wine_new, aes(x=pH_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[20])
+p6 <- ggplot(wine_new, aes(x=Sulphates_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[21])
+p7 <- ggplot(wine_new, aes(x=Alcohol_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[22])
+
+grid.arrange(p1,p2,p3,p4,p5,p6,p7, ncol=2)
+```
+
+Even though we have such a large number of observations, deleting such a large quantity of cases may affect the prediction ability of our models. Deleting all of the cases with missing values will result in the reduction of our data set by about 1/3, but due to the size of the data set, the predictors have very little skew, and the majority of values being clustered around the mean, the cases with NA values will be removed from the data set.  Imputing the mean or median will simply add to the clustering of values around the center of each distribution. A visual comparison of the predictor variables and the quantitiy of NAs is below:  
 
 ```{r NAs_count_plot}
 df_varHasNA <- train %>% 
@@ -152,38 +178,22 @@ df_varHasNA <- train %>%
 aggr(df_varHasNA, prop = TRUE, numbers = TRUE, sortVars = TRUE, cex.lab = 0.4, cex.axis = par("cex"), cex.numbers = par("cex"))
 ```
 
-```{r impute-median}
-fillwithmedian <- function(x) {
-  median_val = median(x, na.rm = TRUE)
-  x[is.na(x)] = median_val
-  return(x)
-}
-
-#Save to different objects for mean, median, deleted
-train1 <- data.frame(lapply(train, fillwithmedian))
-```
-
-```{r impute-mean, eval=FALSE, echo=FALSE}
-fillwithmean <- function(x) {
-  mean_val = mean(x, na.rm = TRUE)
-  x[is.na(x)] = mean_val
-  return(x)
-}
-
-train2 <- data.frame(lapply(train, fillwithmean))
+```{r delete_NAs}
+# delete incomplete cases
+train <- data.frame(train[complete.cases(train), ])
 ```  
 
-Histograms each variable in the data set after imputation of NAs is below
+Histograms each variable in the data set after casewise deleteion is below:
 
 ```{r}
 # check adding zero values for STARS, re-run.
 
-melted3 <- melt(train1)
+melted3 <- melt(train)
 
-ggplot(melted3, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Density of Variables w/Imputed Values\n")
+ggplot(melted3, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Density of Variables After Casewise Deletion\n")
 ```
 
-Examinging all of the variables, there do not appear to be any values far outside of the ranges, values that are nonsensical (negative cases purchased, for example), or need to be removed before moving forward. The combination of variables, or ratios of existing predictors did not seem to yield any effective results. Log or square root transformations may help to improve some of the slightly skewed predictors in our models.  
+Examinging all of the variables, there do not appear to be any values far outside of the ranges, values that are nonsensical (negative cases purchased, for example), or need to be removed before moving forward. The combination of variables, or ratios of existing predictors did not seem to yield any effective results. Log or square root transformations may help to improve models using some of the slightly skewed predictors.  
 
 #MODELS
 
@@ -196,7 +206,7 @@ Before creating the different models, we will investigate using Bayesian Informa
 First, we will look at predictor selection using Bayesian Information Criteria:  
 
 ```{r bic_selection}
-regfit.full=regsubsets(TARGET ~., data=train1)
+regfit.full=regsubsets(TARGET ~., data=train)
 reg.summary <- summary(regfit.full)
 
 par(mfrow=c(1,2))
@@ -204,7 +214,7 @@ plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
 plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Best subset Selection using BIC")
 which.min(reg.summary$bic)
 points(7, reg.summary$bic[7], col="red", cex=2, pch=20)
-reg.summary$bic
+#reg.summary$bic
 ```  
 
 The first plot shows that our most significant predictor, `STARS` would appear in every model, but more effective models would contain the `AcidIndex` and `LabelAppeal` predictors as well. The plot on the right shows the lowest BIC values for models using 7 predictors. We will investigate if adding additional predictors into the model is worth giving up the simplicity of the model. The difference in BIC values for 3 vs. 7 predictors is not drastic.
@@ -212,12 +222,13 @@ The first plot shows that our most significant predictor, `STARS` would appear i
 ###Mallow's $C_p$ Predictor Selection  
 
 ```{r mallow_C_p}
-par(mfrow = c(1,2))
+
 plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
 plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
 
 which.min(reg.summary$cp) 
 points(8, reg.summary$cp[8], col="red", cex=2, pch=20)
+par(mfrow=c(1,1))
 ```  
 
 Using Mallow's $C_p$, the smallest Cp values by far are associated with models with 8 predictors. The more parsimonious models would contain the higher correlated variables (`STARS`, `LabelAppeal`, and `AcidIndex`), but the lowest Cp value model also contains `VolatileAcidity`, `Chlorides`, `FreeSulfurDioxide`, `TotalSulfurDioxide`, and `Alcohol`. 
@@ -226,62 +237,218 @@ Using Mallow's $C_p$, the smallest Cp values by far are associated with models w
 
 ###Full Model  
 
+First, a full model using poisson regression and all 14 of the predictors is built:
+
 ```{r}
-summary(glm(TARGET ~ ., family="poisson", data=train))
+model0 <- (glm(TARGET ~ ., family="poisson", data=train))
+summary(model0)
+#AIC: 31705
 ```
 
+Seven of the predictor coeffcients are significant under a reasonable $\alpha$ of 0.05, and one more, `pH` being just over the threshold. The coefficients themselves are fairly small, with most of the more significant predictors having greater slopes than those which are not. Eight of the coefficients have negative slopes, while the other six are positive. Those with positive coefficients, such as STARS and Label Appeal, make sense as greater ratings and more appealing label aesthetics would entice buyers to purchase more wine.  
+
+###Reduced Model  
+
+A reduced model is created, using the predictors recommended by using Mallow's $C_p$ to determine the best fit. Here, most of the predictors are the highly significant ones from the full poisson regression model.
+
 ```{r}
-summary(glm(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, family="poisson", data=train))
+model1 <- (glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, family="poisson", data=train))
+summary(model1)
+#AIC: 31701
+```  
+
+Of the seven predictors, four have positive coefficients, three have negative slopes. Increases in acidity and chlorides seem to have a negative effect on the number of cases purchased; this may have to do with any wines with more extreme values in these predictors to demand a specific pallette.  All of the coefficients are significant under a p-value of 0.05, with the predictors most correlated to `TARGET` being the most significant. The reduced model using the recommended predictors from Mallow's $C_p$ only returns a very slight reduction in AIC.
+
+For our last poisson regression model, the predictors which were the most significant and highly correlated to our response variable are used:
+
+```{r}
+model2 <- (glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family=poisson, data=train))
+summary(model2)
+#AIC: 31739
+```  
+
+```{r}
+1 - pchisq(summary(model2)$deviance, 
+           summary(model2)$df.residual
+           )
+```  
+
+Here the AIC value increases again slightly, but only three predictors out of 14 are used. The difference in goodness of fit may not be enough to justify using a simpler model. This will be investigated further in the model selection section.  There is also evidence of overdispersion, given that the residual deviance divided by the df is > 1.  The overdispersion may be the result of outliers, possibly in the response variable, given that the largest number of cases ordered happens less frequently than for the other amounts.
+
+##Negative Binomial Regression  
+
+One way of possibly dealing with the overdispersion is using a negative binomial (NB) regression model. Negative binomial regression has the $k$ parameter, which is the dispersion parameter. As this parameter gets larger, the variance will converge to the mean.  
+
+For the first negative binomial regression model, the predictors selected using BIC are used.
+
+```{r}
+model3 <- (glm.nb(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + Alcohol + AcidIndex + LabelAppeal + STARS, data=train))
+summary(model3)
+#AIC 31704
+```  
+
+The AIC for this model is 31704, similar to what was achieved using the predictors selected by Mallow's $C_p$ for the poisson regression. Also similar are the coefficients and directions of the slopes, which is a result of the overdispersion. 
+
+For the second negative binomial model, only the predictors with highly significant coefficients from the previous model are used:
+
+```{r}
+model4 <- (glm.nb(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, data=train))
+summary(model4)
+#AIC: 31715
 ```
-
-```{r}
-summary(glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family="poisson", data=train))
-```  
-
-##Negative Binomial Regression
-
-```{r}
-summary(glm.nb(TARGET ~., data=train))
-```
-
-```{r}
-summary(glm.nb(TARGET ~ log1p(STARS), data=train))
-```  
-
-```{r}
-summary(glm.nb(TARGET ~ LabelAppeal + STARS, data=train))
-```  
 
 ##Multiple Linear Regression  
 
-###Full Model
-
 ```{r}
-summary(glm(TARGET ~., data=train))
+model5 <-(glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train))
+summary(model5)
+#AIC: 29584
 ```
 
-```{r}
-summary(lm(TARGET ~ STARS, data=train))
-
-summary(glm(TARGET ~ STARS, data=train))
-```  
 
 ```{r}
-summary(glm(TARGET ~ LabelAppeal + AcidIndex + STARS, data=train))
+model6 <- glm(TARGET ~ VolatileAcidity + FreeSulfurDioxide + TotalSulfurDioxide + Chlorides + Density + pH + Sulphates + LabelAppeal + AcidIndex + STARS, family=gaussian, data = train)
+summary(model6)
+#AIC: 29570
 ```  
+
 
 #MODEL SELECTION and PREDICTION  
 
 ##Model Comparsion
 
+The characteristics and performance of the six multiple linear regression models from the previous section are compared below:
+
+|Model #| Type | # of Predictors|AIC|
+|---|---|---|---|
+|1|Poisson|7|31701|
+|2|Poisson|3|31739|
+|3|Negative Binomial|8|31705|
+|4|Negative Binomial|5|31750|
+|5|Mult. Linear Reg.|7|29598|
+|6|Mult. Linear Reg.|10|29570|
+
 ##10-fold Cross Validation  
 
-# Appendix A: Index-wise Results from Predictive Model  
+```{r, echo = FALSE}
+k = 10
+set.seed(1306)
+folds = sample(1:k, nrow(train), replace = TRUE)
 
-```{r}
+cv.errors1 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors2 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors3 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors4 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors5 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors6 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 
+#train$target = as.numeric(as.character(train$target))
+
+for (j in 1:k) {
+  
+  model1 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide
+                 + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, family="poisson", data=train[folds != j, ])
+  model2 <- glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family=poisson, data=train[folds != j, ])
+  model3 <- glm.nb(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
+                      TotalSulfurDioxide + Alcohol + AcidIndex + LabelAppeal + STARS, data=train[folds != j, ])
+  model4 <- glm.nb(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal +
+                      AcidIndex + STARS, data=train[folds != j, ])
+  model5 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
+                  TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train[folds != j, ])
+  model6 <- glm(TARGET ~ VolatileAcidity + FreeSulfurDioxide + TotalSulfurDioxide + 
+                  Chlorides + Density + pH + Sulphates + LabelAppeal + AcidIndex + STARS, family=gaussian, data = train[folds != j, ])
+  
+  
+    #best.fit = regsubsets(y ~ ., data = train_df[folds != j, ], nvmax = 10)
+    for (i in 1:10) {
+      f = train[folds == j, ]
+      #f = f[complete.cases(f),]
+      
+      pred1 = predict(model1, f, id = i)
+      cv.errors1[j, i] = mean((train$TARGET[folds == j] - pred1) ^ 2, na.rm = TRUE)
+
+      pred2 = predict(model2, f, id = i) 
+      cv.errors2[j, i] = mean((train$TARGET[folds == j] - pred2) ^ 2, na.rm = TRUE)
+
+      pred3 = predict(model3, f, id = i) 
+      cv.errors3[j, i] = mean((train$TARGET[folds_amt == j] - pred3) ^ 2, na.rm = TRUE)
+       
+      pred4 = predict(model4, f, id = i) 
+      cv.errors4[j, i] = mean((train$TARGET[folds_amt == j] - pred4) ^ 2, na.rm = TRUE)
+       
+      pred5 = predict(model5, f, id = i) 
+      cv.errors5[j, i] = mean((train$TARGET[folds_amt == j] - pred5) ^ 2, na.rm = TRUE)      
+       
+      pred6 = predict(model6, f, id = i)
+      cv.errors6[j, i] = mean((train$TARGET[folds == j] - pred6) ^ 2, na.rm = TRUE)
+      
+  }
+  
+}
+
+
+mean.cv.errors1 <- apply(cv.errors1, 2, mean)
+mean.cv.errors2 <- apply(cv.errors2, 2, mean)
+mean.cv.errors3 <- apply(cv.errors3, 2, mean)
+mean.cv.errors4 <- apply(cv.errors4, 2, mean)
+mean.cv.errors5 <- apply(cv.errors5, 2, mean)
+mean.cv.errors6 <- apply(cv.errors6, 2, mean)
+
+all.cv.error = data.frame(
+mean(mean.cv.errors1),
+mean(mean.cv.errors2),
+mean(mean.cv.errors3),
+mean(mean.cv.errors4), 
+mean(mean.cv.errors5),
+mean(mean.cv.errors6)
+)
+
+names(all.cv.error) = c("Poisson Model 1", "Poisson Model 2", "NB Model 3", "NB Model 4", "MLR Model 5", "MLR Model 6")
+#all.cv.error
+all.cv.error = t(all.cv.error)
+names(all.cv.error) = c("Model", "Mean CV Error")
+
+```  
+
+#####Mean CV Error {-}
+```{r cv-error, echo = FALSE}
+pander(all.cv.error)
 ```
 
+
+
+The linear model is applied to a test dataset containing response variables for 3335 cases.
+
+```{r evaluation, echo=FALSE}
+par(mfrow = c(1, 2), pin = c(2, 2))
+
+predicted_cases <- predict(model6, test, type='response')
+predicted_cases_bin = ifelse(predicted_cases > 0.5, 1, 0)
+```
+
+#####Predicted Targets for Test Data
+```{r, echo = FALSE}
+pander(table(predicted_cases_bin))
+```
+
+#####Targets for Training Data
+```{r, echo = FALSE}
+training_cases = train$TARGET
+pander(table(training_cases))
+```
+
+\newpage
+
+# Appendix A: Index-wise Results from Predictive Model  
+```{r appendix-a}
+appendixA = data.frame(matrix(NA, nrow = 3335, ncol = 2))
+appendixA[, 1] = c(1:3335)
+appendixA[, 2] = predicted_cases_bin[1:3335]
+
+names(appendixA) = c("Index", "Predicted Value", "Index", "Predicted Value")
+
+pander(appendixA)
+```
 \newpage
 
 # Appendix B: R Code {-}
