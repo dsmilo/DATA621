@@ -35,7 +35,7 @@ train <- train[-1] #remove index column
 test = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-evaluation-data.csv")
 ```
 
-##DATA EXPLORATION
+#DATA EXPLORATION
 
 The data set contains 12,795 cases (no pun intended), with an indentification variable (`INDEX`), 14 predictors, and one response variable. Each case is a commerically available wine, with the response variable being the number of cases purchased by restaurants and wine shops after sampling the wine.  Of the 14 predictor variables, 12 are related to chemical preoperties of the wine, while the other two have to do with a rating and label design. 
 
@@ -88,7 +88,6 @@ ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alph
 
 We will revisit the `STARS` variable in the next section, as over 1/4 of the cases contain NAs. It is suspected that these values could be equal to a 0 rating, rather than a missing value.  
 
-
 ```{r box_plots, fig.height=6}
 #Boxpots with ggplot2 - not necessary because of histograms?
 
@@ -108,27 +107,7 @@ melted2$TARGET <- factor(melted2$TARGET)
 ggplot(melted2, aes(TARGET, value)) + geom_boxplot(aes(fill = TARGET), alpha = 0.5) + facet_wrap(~variable, scale="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by TARGET\n")
 ```
 
-Number of cases equalling 6 or greater have no "Label Appeal" less than 0.
-
-```{r}
-#Histogram split by STARS
-ggplot(train, aes(TARGET, fill = factor(STARS))) +
-  geom_histogram(binwidth=, position="dodge")
-
-#Histogram split by LabelAppeal
-ggplot(train, aes(TARGET, fill = factor(LabelAppeal))) +
-  geom_histogram(binwidth=.5, position="dodge")
-```  
-
-Other predictors with NAs:
-
-
-
-```{r predictor-pairs, fig.height=7, fig.width=7}
-pairs(~LabelAppeal + AcidIndex + STARS, data=train, main="Predictors with High Correlattions to Targets", col="slategrey")
-```
-
-##DATA PREPARATION  
+#DATA PREPARATION  
 
 Before attempting to combine or transform any of our variables, the predictor variables with missing values must be addressed. Eight of the predictor variables have missing values, with almost a third of our cases containing an NA. As concluded from our examination of the data in the previous section, the `STARS` variable has over 3000 NA values, which are most likely associated with a 0 rating. Using this reasoning, we will replace the NA values in `STARS` with zeros. 
 
@@ -136,11 +115,13 @@ Before attempting to combine or transform any of our variables, the predictor va
 train$STARS[is.na(train$STARS)] <- 0
 ```  
 
-```{r}
-#plots to compare differnce after adding zero-values
-```  
+The majority of the zero-star ratings we have used to replace the NAs have been placed into cases where our `TARGET` variable is equal to zero. This will increase the correlation between the predictor and the response, and `STARS` will remain the variable with the highest correlation with `TARGET`. 
 
-Because these missing values represent, in many cases, a non-menial proportion of the dataset at large, they are imputed so the cases containing missing values can be included in modeling.  Due to the skewness illustrated by some of the variables with missing data (`INCOME` and `HOME_VAL`), the median is used to avoid any bias introduced into the mean by the skewness of these variables' distribution.  For the remaining two variables, the median is also used for imputation for consistency.
+```{r}
+#Histogram split by STARS
+ggplot(train, aes(TARGET, fill = factor(STARS))) +
+  geom_histogram(binwidth=1, position="dodge")
+```  
 
 The remaining variables with NAs, along with the count and proportion of the total cases is found in the table below:
 
@@ -161,7 +142,7 @@ sum(row_has_NA) #6359 rows (just about 1/3) have at least 1 NA before treating f
 #4120 rows (nearly 1/3) have at least 1 NA after replacing NA w/0 in STARS
 ``` 
 
-With the exception of `Sulphates`, the missing values are approximately 5% or less of the dataset. Even after replacing NAs in the `STARS` variable, nearly one-third of our dataset contains a row with an NA. Even though we have such a large number of observations, deleting such a large quantity of cases may affect the prediction ability of our models. All of these predictors have very little skew; because of this, *the median* will be used to replace the NAs in these respective variables.  
+With the exception of `Sulphates`, the missing values are approximately 5% or less of the each of the above variables. After replacing NAs in the `STARS` variable, nearly one-third of our dataset contains a row with an NA. Even though we have such a large number of observations, deleting such a large quantity of cases may affect the prediction ability of our models. All of these predictors have very little skew; because of this, *the median* will be used to replace the NAs in these respective variables.  A visual comparison of the predictor variables and the quantitiy of NAs is below:  
 
 ```{r NAs_count_plot}
 df_varHasNA <- train %>% 
@@ -170,8 +151,6 @@ df_varHasNA <- train %>%
 #plot of NA counts
 aggr(df_varHasNA, prop = TRUE, numbers = TRUE, sortVars = TRUE, cex.lab = 0.4, cex.axis = par("cex"), cex.numbers = par("cex"))
 ```
-
-
 
 ```{r impute-median}
 fillwithmedian <- function(x) {
@@ -184,7 +163,7 @@ fillwithmedian <- function(x) {
 train1 <- data.frame(lapply(train, fillwithmedian))
 ```
 
-```{r impute-mean}
+```{r impute-mean, eval=FALSE, echo=FALSE}
 fillwithmean <- function(x) {
   mean_val = mean(x, na.rm = TRUE)
   x[is.na(x)] = mean_val
@@ -192,21 +171,61 @@ fillwithmean <- function(x) {
 }
 
 train2 <- data.frame(lapply(train, fillwithmean))
+```  
+
+Histograms each variable in the data set after imputation of NAs is below
+
+```{r}
+# check adding zero values for STARS, re-run.
+
+melted3 <- melt(train1)
+
+ggplot(melted3, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Density of Variables w/Imputed Values\n")
 ```
 
+Examinging all of the variables, there do not appear to be any values far outside of the ranges, values that are nonsensical (negative cases purchased, for example), or need to be removed before moving forward. The combination of variables, or ratios of existing predictors did not seem to yield any effective results. Log or square root transformations may help to improve some of the slightly skewed predictors in our models.  
 
-##MODELS
+#MODELS
 
-###Models Needed:
+Only one response variable exists, and we will use at least two versions of three different types of models. Because the `TARGET` variable is a poisson distribution, we will create two poisson regression models, followed by two models using the negative binomial regression model, and lastly at least two using our familiar multiple linear regression model.  
 
--2 Poisson Regression Models
--2 Negative Binomial Regression
--2 Mulitple Linear Regression
--Optional: zero-inflated poisson and/or negative binomial  regression
+Before creating the different models, we will investigate using Bayesian Information Criteria (BIC) and Mallow's $C_p$ to determine the quantity of predictors, and which ones specifically to use in our models.
 
-###Poisson Regression
+###BIC Predictor Selection
 
-####Full Model
+First, we will look at predictor selection using Bayesian Information Criteria:  
+
+```{r bic_selection}
+regfit.full=regsubsets(TARGET ~., data=train1)
+reg.summary <- summary(regfit.full)
+
+par(mfrow=c(1,2))
+plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
+plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Best subset Selection using BIC")
+which.min(reg.summary$bic)
+points(7, reg.summary$bic[7], col="red", cex=2, pch=20)
+reg.summary$bic
+```  
+
+The first plot shows that our most significant predictor, `STARS` would appear in every model, but more effective models would contain the `AcidIndex` and `LabelAppeal` predictors as well. The plot on the right shows the lowest BIC values for models using 7 predictors. We will investigate if adding additional predictors into the model is worth giving up the simplicity of the model. The difference in BIC values for 3 vs. 7 predictors is not drastic.
+
+###Mallow's $C_p$ Predictor Selection  
+
+```{r mallow_C_p}
+par(mfrow = c(1,2))
+plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
+plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
+
+which.min(reg.summary$cp) 
+points(8, reg.summary$cp[8], col="red", cex=2, pch=20)
+```  
+
+Using Mallow's $C_p$, the smallest Cp values by far are associated with models with 8 predictors. The more parsimonious models would contain the higher correlated variables (`STARS`, `LabelAppeal`, and `AcidIndex`), but the lowest Cp value model also contains `VolatileAcidity`, `Chlorides`, `FreeSulfurDioxide`, `TotalSulfurDioxide`, and `Alcohol`. 
+
+##Poisson Regression
+
+###Full Model  
+
 ```{r}
 summary(glm(TARGET ~ ., family="poisson", data=train))
 ```
@@ -219,7 +238,7 @@ summary(glm(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal + AcidIn
 summary(glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family="poisson", data=train))
 ```  
 
-###Negative Binomial Regression
+##Negative Binomial Regression
 
 ```{r}
 summary(glm.nb(TARGET ~., data=train))
@@ -233,9 +252,9 @@ summary(glm.nb(TARGET ~ log1p(STARS), data=train))
 summary(glm.nb(TARGET ~ LabelAppeal + STARS, data=train))
 ```  
 
-###Multiple Linear Regression  
+##Multiple Linear Regression  
 
-####Full Model
+###Full Model
 
 ```{r}
 summary(glm(TARGET ~., data=train))
@@ -251,5 +270,22 @@ summary(glm(TARGET ~ STARS, data=train))
 summary(glm(TARGET ~ LabelAppeal + AcidIndex + STARS, data=train))
 ```  
 
-##MODEL SELECTION and PREDICTION  
+#MODEL SELECTION and PREDICTION  
 
+##Model Comparsion
+
+##10-fold Cross Validation  
+
+# Appendix A: Index-wise Results from Predictive Model  
+
+```{r}
+
+```
+
+\newpage
+
+# Appendix B: R Code {-}
+
+```{r appendix-b, echo=TRUE, eval=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+
+```
