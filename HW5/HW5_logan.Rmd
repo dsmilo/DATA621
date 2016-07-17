@@ -122,7 +122,7 @@ The majority of the zero-star ratings we have used to replace the NAs have been 
 ```{r}
 #Histogram split by STARS
 ggplot(train, aes(TARGET, fill = factor(STARS))) +
-  geom_histogram(binwidth=1, position="dodge")
+  geom_histogram(binwidth=1, position="dodge") + scale_fill_discrete(name = "STARS") + theme(legend.position = "bottom")
 ```  
 
 The remaining variables with NAs, along with the count and proportion of the total cases is found in the table below:
@@ -184,7 +184,7 @@ aggr(df_varHasNA, prop = TRUE, numbers = TRUE, sortVars = TRUE, cex.lab = 0.4, c
 train <- data.frame(train[complete.cases(train), ])
 ```  
 
-Histograms each variable in the data set after casewise deleteion is below:
+Histograms of each variable in the data set after casewise deleteion is below:
 
 ```{r}
 # check adding zero values for STARS, re-run.
@@ -424,13 +424,13 @@ The linear model is applied to a test dataset containing response variables for 
 par(mfrow = c(1, 2), pin = c(2, 2))
 
 predicted_cases <- predict(model6, test, type='response')
-predicted_cases_stars = round(predicted_cases, 0)
+predicted_cases_int = round(predicted_cases, 0)
 ```
 
-The predicted ratings are converted to even star values by rounding to the nearest integer.  A table of the proportion of ratings at each star level is presented for both the test and training datasets.
+The predicted ratings are converted to even case values by rounding to the nearest integer.  A table of the proportion of ratings at each number of cases is presented for both the test and training datasets.
 
 ```{r, echo = FALSE}
-table_test <- table(predicted_cases_stars) / length(predicted_cases_stars)
+table_test <- table(predicted_cases_int) / length(predicted_cases_int)
 table_test <- c(0, table_test, 0)
 names(table_test)[1] <- "0"; names(table_test)[9] <- "8"
 table_train <- table(train$TARGET) / length(train$TARGET)
@@ -439,7 +439,7 @@ row.names(table_ratings) <- c("Test", "Train")
 pander(table_ratings, round = 3)
 ```
 
-The full sets of predictions -- both raw predicted values and even star values -- for the evaluation dataset are available in Appendix A.
+The full sets of predictions -- both raw predicted values and even case values -- for the evaluation dataset are available in Appendix A.
 
 \newpage
 
@@ -448,13 +448,13 @@ The full sets of predictions -- both raw predicted values and even star values -
 appendixA = data.frame(matrix(NA, nrow = 1667, ncol = 6))
 appendixA[, 1] = test$IN[1:1667]
 appendixA[, 2] = predicted_cases[1:1667]
-appendixA[, 3] = predicted_cases_stars[1:1667]
+appendixA[, 3] = predicted_cases_int[1:1667]
 appendixA[, 4] = test$IN[1669:3335]
 appendixA[, 5] = predicted_cases[1669:3335]
-appendixA[, 6] = predicted_cases_stars[1669:3335]
-appendixA <- rbind(appendixA, c(test$IN[1668], predicted_cases[1668], predicted_cases_stars[1688], rep(NA, 3)))
+appendixA[, 6] = predicted_cases_int[1669:3335]
+appendixA <- rbind(appendixA, c(test$IN[1668], predicted_cases[1668], predicted_cases_int[1688], rep(NA, 3)))
 
-names(appendixA) = rep(c("Index", "Value", "Stars"), 2)
+names(appendixA) = rep(c("Index", "Value", "Cases"), 2)
 
 pander(appendixA)
 ```
