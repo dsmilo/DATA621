@@ -43,6 +43,8 @@ The data set contains 12,795 cases (no pun intended), with an indentification va
 
 A summary of each variable is presented below:
 
+\newpage
+
 ```{r summary}
 means <- sapply(train, function(y) mean(y, na.rm = TRUE))
 mins <- sapply(train, function(y) min(y, na.rm=TRUE))
@@ -198,6 +200,8 @@ Examinging all of the variables, there do not appear to be any values far outsid
 
 Log or square root transformations may help to improve models using some of the slightly skewed predictors.  In particular, `AcidIndex` appears the most skewed of the predictors.  Log and square root transformations are performed to observe the change in correlation of this variable with `TARGET` --- both improve the correlation by a very small amount, but the log-transform yields a greater improvement.
 
+\newpage
+
 #Model Creation
 
 Only one response variable exists, and we will use at least two versions of three different types of models. Because the `TARGET` variable is a poisson distribution, we will create two poisson regression models, followed by two models using the negative binomial regression model, and lastly at least two using our familiar multiple linear regression model.  
@@ -310,11 +314,11 @@ The AIC for this model increased slightly to 31715.  The coefficients for the re
 
 ##Multiple Linear Regression  
 
-In response to the high level of dispersion exhibited, two multiple linear regression models are created on the data.
+In response to the high level of dispersion exhibited, two multiple linear regression models are created on the data.  A full model, including the log-transformed acid index variable, is built (but not presented here) to aid in variable selection.
 
-###Model 5: Model Name
+###Model 5: Reduced Model
 
-*Explanation of model*
+The 7 most significant predictors from the full model are used to create a modified linear model.  Most of these predictors match the BIC-selected predictors (with the exception of the log transformation on `AcidIndex`).
 
 ```{r}
 model5 <-glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train)
@@ -322,11 +326,11 @@ pander(summary(model5))
 #AIC: 29584
 ```
 
-*Discussion of coefficients*
+This model yields an AIC of 29584.  The signs of these coefficients match those of the BIC-criteria negative binomial model.  Many of the coefficients have similar magnitudes, but in this model, the effects of `LabelAppeal` and `STARS` are greater by roughly three-fold.  Additionally, the coefficient for the `AcidIndex` variable has increased roughly 20-fold, but this can be largely attributed to the fact that it refers to the transformed variable.  All predictors show very high statistical significance.
 
-### Model 6: Model Name
+### Model 6: Significant Predictors
 
-*Explanation of Model*
+A second linear model is created, including any non-transformed predictors that held statistical significance at the $\alpha = 0.10$ level.
 
 ```{r}
 model6 <- glm(TARGET ~ VolatileAcidity + FreeSulfurDioxide + TotalSulfurDioxide + Chlorides + Density + pH + Sulphates + LabelAppeal + AcidIndex + STARS, family=gaussian, data = train)
@@ -334,13 +338,13 @@ pander(summary(model6))
 #AIC: 29570
 ```  
 
-*Discussion of Coefficients*
+This multiple linear model returns an AIC of 29570, the lowest of any models created.  The coefficients have the same sign and very similar magnitudes as those of the reduced model above.  The three predictors not included in model 5 have similar coefficients to those of model 3 above.  These three predictors -- `Density`, `pH`, and `Sulphates` -- are not significant at the $\alpha = 0.5$ level, but two of them are marginally not significant, and all three would still be significant at the $\alpha = 0.10$ level.
 
 #Model Selection and Prediction  
 
 ##Model Comparsion
 
-The characteristics and performance of the six multiple linear regression models from the previous section are compared below:
+The characteristics and performance of the seven multiple linear regression models from the previous section are compared below:
 
 |Model #| Type | # of Predictors|AIC|
 |---|---|---|---|
@@ -370,7 +374,7 @@ cv.errors6 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 #train$target = as.numeric(as.character(train$target))
 
 for (j in 1:k) {
-  model0 <- glm(TARGET ~ ., family="poisson", data=train[folds != j])
+  model0 <- glm(TARGET ~ ., family="poisson", data=train[folds != j, ])
   model1 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
                   TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS + Alcohol + 
                   Density + Sulphates + pH, family="poisson", data=train[folds != j, ])
@@ -445,7 +449,7 @@ names(all.cv.error) = c("Model", "Mean CV Error")
 pander(all.cv.error)
 ```
 
-Multiple Linear Model 6 exhibits both the lowest AIC and the lowest mean cross-validation error.  This may seem surprising given the nature of the `TARGET` data, but is a sensible outcome given the overdispersion apparent in the data.
+Multiple Linear Model 6 exhibits both the lowest AIC and the lowest mean cross-validation error.  This may seem surprising given the nature of the `TARGET` data, but is a sensible outcome given the overdispersion apparent in the data.  The linear nature of this model provides the benefit of being easily understood by a wide audience as compared to Poisson or negative binomial models.
 
 The linear model is applied to a test dataset containing response variables for 3335 cases.
 
