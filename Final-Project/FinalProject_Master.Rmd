@@ -104,7 +104,6 @@ test = test2
 
 
 ##Abstract
-Regression techniques are used to predict loan approval status of customers of a fictional bank given a number of predictors.  Techniques utilized include logistic regression, ridge regression, the Adaboost algorithm, and neural networks.  The optimal model created yields an accuracy of 0.8056.
 
 
 ####Keywords:
