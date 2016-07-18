@@ -287,27 +287,32 @@ One way of possibly dealing with the overdispersion is using a negative binomial
 For the first negative binomial regression model, the predictors selected using BIC are used.
 
 ```{r}
-model3 <- (glm.nb(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + Alcohol + AcidIndex + LabelAppeal + STARS, data=train))
+model3 <- glm.nb(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + AcidIndex + LabelAppeal + STARS, data=train)
 pander(summary(model3))
 #AIC 31704
 ```  
 
-The AIC for this model is 31704, similar to what was achieved using the predictors selected by Mallow's $C_p$ for the poisson regression. Also similar are the coefficients and directions of the slopes, which is a result of the overdispersion. 
+The AIC for this model is 31704, similar to what was achieved using the predictors selected by Mallow's $C_p$ for the Poisson regression. Also similar are the coefficients and directions of the slopes, which is a result of the overdispersion. 
 
 ###Model 4: Significant Predictors
 
 For the second negative binomial model, only the predictors with highly significant coefficients from the previous model are used:
 
 ```{r}
-model4 <- (glm.nb(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, data=train))
+model4 <- glm.nb(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, data=train)
 pander(summary(model4))
 #AIC: 31715
 ```
 
+The AIC for this model increased slightly to 31715.  The coefficients for the reduced model are quite similar to the full BIC criteria model, but their significance has increased.
+
 ##Multiple Linear Regression  
 
-Finally, two multiple linear regression models are created on the data.
+In response to the high level of dispersion exhibited, two multiple linear regression models are created on the data.
 
+###Model 5: Model Name
+
+*Explanation of model*
 
 ```{r}
 model5 <-glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train)
@@ -315,6 +320,11 @@ pander(summary(model5))
 #AIC: 29584
 ```
 
+*Discussion of coefficients*
+
+### Model 6: Model Name
+
+*Explanation of Model*
 
 ```{r}
 model6 <- glm(TARGET ~ VolatileAcidity + FreeSulfurDioxide + TotalSulfurDioxide + Chlorides + Density + pH + Sulphates + LabelAppeal + AcidIndex + STARS, family=gaussian, data = train)
@@ -322,6 +332,7 @@ pander(summary(model6))
 #AIC: 29570
 ```  
 
+*Discussion of Coefficients*
 
 #MODEL SELECTION and PREDICTION  
 
@@ -334,7 +345,7 @@ The characteristics and performance of the six multiple linear regression models
 |0|Poisson|14|31705|
 |1|Poisson|11|31700|
 |2|Poisson|3|31739|
-|3|Negative Binomial|8|31705|
+|3|Negative Binomial|7|31704|
 |4|Negative Binomial|5|31750|
 |5|Mult. Linear Reg.|7|29598|
 |6|Mult. Linear Reg.|10|29570|
@@ -346,6 +357,7 @@ k = 10
 set.seed(1306)
 folds = sample(1:k, nrow(train), replace = TRUE)
 
+cv.errors0 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 cv.errors1 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 cv.errors2 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 cv.errors3 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
@@ -356,7 +368,7 @@ cv.errors6 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 #train$target = as.numeric(as.character(train$target))
 
 for (j in 1:k) {
-  
+  model0 <- glm(TARGET ~ ., family="poisson", data=train[fold != j])
   model1 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
                   TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS + Alcohol + 
                   Density + Sulphates + pH, family="poisson", data=train[folds != j, ])
@@ -375,6 +387,9 @@ for (j in 1:k) {
     for (i in 1:10) {
       f = train[folds == j, ]
       #f = f[complete.cases(f),]
+      
+      pred0 = predict(model0, f, id = i)
+      cv.errors0[j, i] = mean((train$TARGET[folds == j] - pred1) ^ 2, na.rm = TRUE)
       
       pred1 = predict(model1, f, id = i)
       cv.errors1[j, i] = mean((train$TARGET[folds == j] - pred1) ^ 2, na.rm = TRUE)
@@ -398,7 +413,7 @@ for (j in 1:k) {
   
 }
 
-
+mean.cv.errors0 <- apply(cv.errors0, 2, mean)
 mean.cv.errors1 <- apply(cv.errors1, 2, mean)
 mean.cv.errors2 <- apply(cv.errors2, 2, mean)
 mean.cv.errors3 <- apply(cv.errors3, 2, mean)
@@ -407,6 +422,7 @@ mean.cv.errors5 <- apply(cv.errors5, 2, mean)
 mean.cv.errors6 <- apply(cv.errors6, 2, mean)
 
 all.cv.error = data.frame(
+mean(mean.cv.errors0),
 mean(mean.cv.errors1),
 mean(mean.cv.errors2),
 mean(mean.cv.errors3),
@@ -415,7 +431,7 @@ mean(mean.cv.errors5),
 mean(mean.cv.errors6)
 )
 
-names(all.cv.error) = c("Poisson Model 1", "Poisson Model 2", "NB Model 3", "NB Model 4", "MLR Model 5", "MLR Model 6")
+names(all.cv.error) = c("Poisson Model 0", "Poisson Model 1", "Poisson Model 2", "NB Model 3", "NB Model 4", "MLR Model 5", "MLR Model 6")
 #all.cv.error
 all.cv.error = t(all.cv.error)
 names(all.cv.error) = c("Model", "Mean CV Error")
@@ -427,7 +443,7 @@ names(all.cv.error) = c("Model", "Mean CV Error")
 pander(all.cv.error)
 ```
 
-
+Multiple Linear Model 6 exhibits both the lowest AIC and the lowest mean cross-validation error.  This may seem surprising given the nature of the `TARGET` data, but is a sensible outcome given the overdispersion apparent in the data.
 
 The linear model is applied to a test dataset containing response variables for 3335 cases.
 
