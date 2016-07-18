@@ -368,7 +368,7 @@ cv.errors6 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 #train$target = as.numeric(as.character(train$target))
 
 for (j in 1:k) {
-  model0 <- glm(TARGET ~ ., family="poisson", data=train[fold != j])
+  model0 <- glm(TARGET ~ ., family="poisson", data=train[folds != j])
   model1 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
                   TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS + Alcohol + 
                   Density + Sulphates + pH, family="poisson", data=train[folds != j, ])
@@ -389,7 +389,7 @@ for (j in 1:k) {
       #f = f[complete.cases(f),]
       
       pred0 = predict(model0, f, id = i)
-      cv.errors0[j, i] = mean((train$TARGET[folds == j] - pred1) ^ 2, na.rm = TRUE)
+      cv.errors0[j, i] = mean((train$TARGET[folds == j] - pred0) ^ 2, na.rm = TRUE)
       
       pred1 = predict(model1, f, id = i)
       cv.errors1[j, i] = mean((train$TARGET[folds == j] - pred1) ^ 2, na.rm = TRUE)
