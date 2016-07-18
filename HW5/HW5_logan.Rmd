@@ -276,12 +276,6 @@ pander(summary(model2))
 #AIC: 31739
 ```  
 
-```{r}
-1 - pchisq(summary(model2)$deviance, 
-           summary(model2)$df.residual
-           )
-```  
-
 Here the AIC value increases again slightly, but only three predictors out of 14 are used. The difference in goodness of fit may not be enough to justify using a simpler model. This will be investigated further in the model selection section.  There is also evidence of overdispersion, given that the residual deviance divided by the df is > 1.  The overdispersion may be the result of outliers, possibly in the response variable, given that the largest number of cases ordered happens less frequently than for the other amounts.
 
 ##Negative Binomial Regression  
@@ -292,7 +286,7 @@ One way of possibly dealing with the overdispersion is using a negative binomial
 
 For the first negative binomial regression model, the predictors selected using BIC are used.
 
-```{r}
+```{r, error=FALSE}
 model3 <- glm.nb(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + AcidIndex + LabelAppeal + STARS, data=train)
 pander(summary(model3))
 #AIC 31704
@@ -304,7 +298,7 @@ The AIC for this model is 31704, similar to what was achieved using the predicto
 
 For the second negative binomial model, only the predictors with highly significant coefficients from the previous model are used:
 
-```{r}
+```{r, error=FALSE}
 model4 <- glm.nb(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, data=train)
 pander(summary(model4))
 #AIC: 31715
@@ -454,8 +448,6 @@ Multiple Linear Model 6 exhibits both the lowest AIC and the lowest mean cross-v
 The linear model is applied to a test dataset containing response variables for 3335 cases.
 
 ```{r evaluation, echo=FALSE}
-par(mfrow = c(1, 2), pin = c(2, 2))
-
 predicted_cases <- predict(model6, test, type='response')
 predicted_cases_int = round(predicted_cases, 0)
 ```
@@ -496,5 +488,255 @@ pander(appendixA)
 # Appendix B: R Code {-}
 
 ```{r appendix-b, echo=TRUE, eval=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# setup -----
+library(dplyr)
+library(VIM)
+library(ggplot2)
+library(MASS)
+library(gridExtra)
+library(caret)
+library(pROC)
+library(grid)
+library(leaps)
+library(reshape2)
+library(vcd)
+library(glmnet)
+library(e1071)
+library(car)
+library(pander)
 
+train = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-training-data.csv")
+train <- train[-1] #remove index column
+test = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-evaluation-data.csv")
+
+# summary -----
+means <- sapply(train, function(y) mean(y, na.rm = TRUE))
+mins <- sapply(train, function(y) min(y, na.rm=TRUE))
+medians <- sapply(train, function(y) median(y, na.rm = TRUE))
+maxs <- sapply(train, function(y) max(y, na.rm=TRUE))
+IQRs <- sapply(train, function(y) IQR(y, na.rm = TRUE))
+SDs <- sapply(train, function(y) sd(y, na.rm = T))
+skews <- sapply(train, function(y) skewness(y, na.rm = TRUE))
+cors <- as.vector(cor(train$TARGET, train[ , 1:ncol(train)], use = "complete.obs"))
+NAs <- sapply(train, function(y) sum(length(which(is.na(y)))))
+
+datasummary <- data.frame(means, mins, medians, maxs, IQRs, SDs, skews, cors, NAs)
+colnames(datasummary) <- c("MEAN", "MIN","MEDIAN", "MAX", "IQR", "STD. DEV", 
+                           "SKEW", "$r_{TARGET}$", "NAs")
+datasummary <- round(datasummary, 2)
+
+pander(datasummary)
+
+# variable plots-----
+cont_vars <- train %>% dplyr::select(-c(TARGET, LabelAppeal, AcidIndex, STARS))
+
+melted <- melt(cont_vars)
+
+ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Distribution of Continuous Variables \n")
+
+poisson_vars <- train %>% dplyr::select(c(TARGET, LabelAppeal, AcidIndex, STARS))
+
+melted <- melt(poisson_vars)
+
+ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scales="free")+ ggtitle("Distribution of Discrete Variables \n")
+
+density_df2 <- train
+
+melted2 <- melt(density_df2, id=1)
+melted2$TARGET <- factor(melted2$TARGET)
+
+ggplot(melted2, aes(TARGET, value)) + geom_boxplot(aes(fill = TARGET), alpha = 0.5) + facet_wrap(~variable, scales="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by TARGET\n")
+
+# treat NAs-----
+train$STARS[is.na(train$STARS)] <- 0
+
+ggplot(train, aes(TARGET, fill = factor(STARS))) +
+  geom_histogram(binwidth=1, position="dodge") + scale_fill_discrete(name = "STARS") + theme(legend.position = "bottom")
+
+row_has_NA <- apply(train, 1, function(x){any(is.na(x))})
+
+sum(row_has_NA)
+
+wine_new <- train
+
+wine_new$ResidualSugar_NA <- factor(ifelse(is.na(train$ResidualSugar), 1, 0))
+wine_new$Chlorides_NA <- factor(ifelse(is.na(train$Chlorides), 1, 0))
+wine_new$FreeSulfurDioxide_NA <- factor(ifelse(is.na(train$FreeSulfurDioxide), 1, 0))
+wine_new$TotalSulfurDioxide_NA <- factor(ifelse(is.na(train$TotalSulfurDioxide), 1, 0))
+wine_new$pH_NA <- factor(ifelse(is.na(train$pH), 1, 0))
+wine_new$Sulphates_NA <- factor(ifelse(is.na(train$Sulphates), 1, 0))
+wine_new$Alcohol_NA <- factor(ifelse(is.na(train$Alcohol), 1, 0))
+
+
+p1 <- ggplot(wine_new, aes(x=ResidualSugar_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[16])
+p2 <- ggplot(wine_new, aes(x=Chlorides_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[17])
+p3 <- ggplot(wine_new, aes(x=FreeSulfurDioxide_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[18])
+p4 <- ggplot(wine_new, aes(x=TotalSulfurDioxide_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[19])
+p5 <- ggplot(wine_new, aes(x=pH_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[20])
+p6 <- ggplot(wine_new, aes(x=Sulphates_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[21])
+p7 <- ggplot(wine_new, aes(x=Alcohol_NA, y=TARGET)) + geom_violin() + geom_jitter(alpha=0.2, size=0.2, col="skyblue") + xlab(colnames(wine_new)[22])
+
+grid.arrange(p1,p2,p3,p4,p5,p6,p7, ncol=2)
+
+df_varHasNA <- train %>% 
+  dplyr::select(-c(TARGET, FixedAcidity, VolatileAcidity, CitricAcid,Density, LabelAppeal, AcidIndex, STARS))
+
+aggr(df_varHasNA, prop = TRUE, numbers = TRUE, sortVars = TRUE, cex.lab = 0.4, cex.axis = par("cex"), cex.numbers = par("cex"))
+
+train <- data.frame(train[complete.cases(train), ])
+
+melted3 <- melt(train)
+
+ggplot(melted3, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Density of Variables After Casewise Deletion\n")
+
+# predictor selection-----
+regfit.full=regsubsets(TARGET ~., data=train, nvmax = 14)
+reg.summary <- summary(regfit.full)
+
+par(mfrow=c(1,2))
+plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
+plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Best subset Selection using BIC")
+points(7, reg.summary$bic[7], col="red", cex=2, pch=20)
+
+par(mfrow=c(1,2))
+plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
+plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp")
+points(11, reg.summary$cp[11], col="red", cex=2, pch=20)
+par(mfrow=c(1,1))
+
+# Poisson models -----
+model0 <- (glm(TARGET ~ ., family="poisson", data=train))
+pander(summary(model0))
+
+model1 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS + Alcohol + Density + Sulphates + pH, family="poisson", data=train)
+pander(summary(model1))
+
+model2 <- (glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family=poisson, data=train))
+pander(summary(model2))
+
+# NB models -----
+model3 <- glm.nb(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + AcidIndex + LabelAppeal + STARS, data=train)
+pander(summary(model3))
+
+model4 <- glm.nb(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, data=train)
+pander(summary(model4))
+
+# linear models -----
+model5 <-glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train)
+pander(summary(model5))
+
+model6 <- glm(TARGET ~ VolatileAcidity + FreeSulfurDioxide + TotalSulfurDioxide + Chlorides + Density + pH + Sulphates + LabelAppeal + AcidIndex + STARS, family=gaussian, data = train)
+pander(summary(model6))
+
+# cross validation-----
+k = 10
+set.seed(1306)
+folds = sample(1:k, nrow(train), replace = TRUE)
+
+cv.errors0 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors1 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors2 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors3 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors4 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors5 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+cv.errors6 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
+
+#train$target = as.numeric(as.character(train$target))
+
+for (j in 1:k) {
+  model0 <- glm(TARGET ~ ., family="poisson", data=train[folds != j, ])
+  model1 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
+                  TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS + Alcohol + 
+                  Density + Sulphates + pH, family="poisson", data=train[folds != j, ])
+  model2 <- glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family="poisson", data=train[folds != j, ])
+  model3 <- glm.nb(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
+                      TotalSulfurDioxide + Alcohol + AcidIndex + LabelAppeal + STARS, data=train[folds != j, ])
+  model4 <- glm.nb(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal +
+                      AcidIndex + STARS, data=train[folds != j, ])
+  model5 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
+                  TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train[folds != j, ])
+  model6 <- glm(TARGET ~ VolatileAcidity + FreeSulfurDioxide + TotalSulfurDioxide + 
+                  Chlorides + Density + pH + Sulphates + LabelAppeal + AcidIndex + STARS, family="gaussian", data = train[folds != j, ])
+  
+  
+    #best.fit = regsubsets(y ~ ., data = train_df[folds != j, ], nvmax = 10)
+    for (i in 1:10) {
+      f = train[folds == j, ]
+      #f = f[complete.cases(f),]
+      
+      pred0 = predict(model0, f, id = i)
+      cv.errors0[j, i] = mean((train$TARGET[folds == j] - pred0) ^ 2, na.rm = TRUE)
+      
+      pred1 = predict(model1, f, id = i)
+      cv.errors1[j, i] = mean((train$TARGET[folds == j] - pred1) ^ 2, na.rm = TRUE)
+
+      pred2 = predict(model2, f, id = i) 
+      cv.errors2[j, i] = mean((train$TARGET[folds == j] - pred2) ^ 2, na.rm = TRUE)
+
+      pred3 = predict(model3, f, id = i) 
+      cv.errors3[j, i] = mean((train$TARGET[folds == j] - pred3) ^ 2, na.rm = TRUE)
+       
+      pred4 = predict(model4, f, id = i) 
+      cv.errors4[j, i] = mean((train$TARGET[folds == j] - pred4) ^ 2, na.rm = TRUE)
+       
+      pred5 = predict(model5, f, id = i) 
+      cv.errors5[j, i] = mean((train$TARGET[folds == j] - pred5) ^ 2, na.rm = TRUE)      
+       
+      pred6 = predict(model6, f, id = i)
+      cv.errors6[j, i] = mean((train$TARGET[folds == j] - pred6) ^ 2, na.rm = TRUE)
+      
+  }
+  
+}
+
+mean.cv.errors0 <- apply(cv.errors0, 2, mean)
+mean.cv.errors1 <- apply(cv.errors1, 2, mean)
+mean.cv.errors2 <- apply(cv.errors2, 2, mean)
+mean.cv.errors3 <- apply(cv.errors3, 2, mean)
+mean.cv.errors4 <- apply(cv.errors4, 2, mean)
+mean.cv.errors5 <- apply(cv.errors5, 2, mean)
+mean.cv.errors6 <- apply(cv.errors6, 2, mean)
+
+all.cv.error = data.frame(
+mean(mean.cv.errors0),
+mean(mean.cv.errors1),
+mean(mean.cv.errors2),
+mean(mean.cv.errors3),
+mean(mean.cv.errors4), 
+mean(mean.cv.errors5),
+mean(mean.cv.errors6)
+)
+
+names(all.cv.error) = c("Poisson Model 0", "Poisson Model 1", "Poisson Model 2", "NB Model 3", "NB Model 4", "MLR Model 5", "MLR Model 6")
+#all.cv.error
+all.cv.error = t(all.cv.error)
+names(all.cv.error) = c("Model", "Mean CV Error")
+
+pander(all.cv.error)
+
+# prediction-----
+predicted_cases <- predict(model6, test, type='response')
+predicted_cases_int = round(predicted_cases, 0)
+
+table_test <- table(predicted_cases_int) / length(predicted_cases_int)
+table_test <- c(0, table_test, 0)
+names(table_test)[1] <- "0"; names(table_test)[9] <- "8"
+table_train <- table(train$TARGET) / length(train$TARGET)
+table_ratings <- rbind(table_test, table_train)
+row.names(table_ratings) <- c("Test", "Train")
+pander(table_ratings, round = 3)
+
+# prediction results -----
+appendixA = data.frame(matrix(NA, nrow = 1667, ncol = 6))
+appendixA[, 1] = test$IN[1:1667]
+appendixA[, 2] = predicted_cases[1:1667]
+appendixA[, 3] = predicted_cases_int[1:1667]
+appendixA[, 4] = test$IN[1669:3335]
+appendixA[, 5] = predicted_cases[1669:3335]
+appendixA[, 6] = predicted_cases_int[1669:3335]
+appendixA <- rbind(appendixA, c(test$IN[1668], predicted_cases[1668], predicted_cases_int[1688], rep(NA, 3)))
+
+names(appendixA) = rep(c("Index", "Value", "Cases"), 2)
+
+pander(appendixA)
 ```
