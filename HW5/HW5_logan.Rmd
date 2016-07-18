@@ -213,7 +213,7 @@ reg.summary <- summary(regfit.full)
 par(mfrow=c(1,2))
 plot(regfit.full, scale = "bic", main = "Predictor Variables vs. BIC")
 plot(reg.summary$bic, xlab="Number of Predictors", ylab="BIC", type="l", main="Best subset Selection using BIC")
-which.min(reg.summary$bic)
+#which.min(reg.summary$bic)
 points(7, reg.summary$bic[7], col="red", cex=2, pch=20)
 #reg.summary$bic
 ```  
@@ -223,22 +223,22 @@ The first plot shows that our most significant predictor, `STARS` would appear i
 ###Mallow's $C_p$ Predictor Selection  
 
 ```{r mallow_C_p}
-
+par(mfrow=c(1,2))
 plot(regfit.full, scale="Cp", main="Predictor Variables vs. Cp")
 plot(reg.summary$cp, xlab="Number of Predictors", ylab="Cp", type="l", main="Best subset Selection using Cp" )
 
-which.min(reg.summary$cp) 
-points(8, reg.summary$cp[8], col="red", cex=2, pch=20)
+#which.min(reg.summary$cp) 
+points(11, reg.summary$cp[11], col="red", cex=2, pch=20)
 par(mfrow=c(1,1))
 ```  
 
-Using Mallow's $C_p$, the smallest Cp values by far are associated with models with 8 predictors. The more parsimonious models would contain the higher correlated variables (`STARS`, `LabelAppeal`, and `AcidIndex`), but the lowest Cp value model also contains `VolatileAcidity`, `Chlorides`, `FreeSulfurDioxide`, `TotalSulfurDioxide`, and `Alcohol`. 
+Using Mallow's $C_p$, the smallest Cp values are associated with models with 11 predictors. The more parsimonious models would contain the higher correlated variables (`STARS`, `LabelAppeal`, and `AcidIndex`), but the lowest Cp value model also contains `VolatileAcidity`, `Chlorides`, `FreeSulfurDioxide`, `TotalSulfurDioxide`, `Alcohol`, `Density`, `Sulphates`, and `pH`. 
 
 ##Poisson Regression
 
-###Full Model  
+###Model 0: Full Model  
 
-First, a full model using poisson regression and all 14 of the predictors is built:
+First, a full model using Poisson regression and all 14 of the predictors is built:
 
 ```{r}
 model0 <- (glm(TARGET ~ ., family="poisson", data=train))
@@ -246,19 +246,21 @@ pander(summary(model0))
 #AIC: 31705
 ```
 
-Seven of the predictor coeffcients are significant under a reasonable $\alpha$ of 0.05, and one more, `pH` being just over the threshold. The coefficients themselves are fairly small, with most of the more significant predictors having greater slopes than those which are not. Eight of the coefficients have negative slopes, while the other six are positive. Those with positive coefficients, such as STARS and Label Appeal, make sense as greater ratings and more appealing label aesthetics would entice buyers to purchase more wine.  
+Seven of the predictor coeffcients are significant under a reasonable $\alpha$ of 0.05, and one more, `pH` being just over the threshold. The coefficients themselves are fairly small, with most of the more significant predictors having slopes of greater magnitude than those which are not. Eight of the coefficients have negative slopes, while the other six are positive. Those with positive coefficients, such as `STARS` and `LabelAppeal`, make sense as greater ratings and more appealing label aesthetics would entice buyers to purchase more wine.  
 
-###Reduced Model  
+###Model 1: Reduced Model  
 
 A reduced model is created, using the predictors recommended by using Mallow's $C_p$ to determine the best fit. Here, most of the predictors are the highly significant ones from the full poisson regression model.
 
 ```{r}
-model1 <- (glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, family="poisson", data=train))
+model1 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS + Alcohol + Density + Sulphates + pH, family="poisson", data=train)
 pander(summary(model1))
-#AIC: 31701
+#AIC: 31700
 ```  
 
-Of the seven predictors, four have positive coefficients, three have negative slopes. Increases in acidity and chlorides seem to have a negative effect on the number of cases purchased; this may have to do with any wines with more extreme values in these predictors to demand a specific pallette.  All of the coefficients are significant under a p-value of 0.05, with the predictors most correlated to `TARGET` being the most significant. The reduced model using the recommended predictors from Mallow's $C_p$ only returns a very slight reduction in AIC.
+Of the 11 predictors, five have positive coefficients, six have negative coefficients. Increases in acidity and chlorides seem to have a negative effect on the number of cases purchased; this may have to do with any wines with more extreme values in these predictors to demand a specific pallette.  Four variables are not significate at the $\alpha = 0.5$ level: `Alcohol`, `Density`, `Sulphates`, and `pH`.  The predictors most correlated to `TARGET` have the most significant statistical significance. The reduced model using the recommended predictors from Mallow's $C_p$ only returns a very slight reduction in AIC.
+
+###Model 2: Significant Reduced Model 
 
 For our last poisson regression model, the predictors which were the most significant and highly correlated to our response variable are used:
 
@@ -280,6 +282,8 @@ Here the AIC value increases again slightly, but only three predictors out of 14
 
 One way of possibly dealing with the overdispersion is using a negative binomial (NB) regression model. Negative binomial regression has the $k$ parameter, which is the dispersion parameter. As this parameter gets larger, the variance will converge to the mean.  
 
+###Model 3: BIC Predictors
+
 For the first negative binomial regression model, the predictors selected using BIC are used.
 
 ```{r}
@@ -289,6 +293,8 @@ pander(summary(model3))
 ```  
 
 The AIC for this model is 31704, similar to what was achieved using the predictors selected by Mallow's $C_p$ for the poisson regression. Also similar are the coefficients and directions of the slopes, which is a result of the overdispersion. 
+
+###Model 4: Significant Predictors
 
 For the second negative binomial model, only the predictors with highly significant coefficients from the previous model are used:
 
@@ -300,8 +306,11 @@ pander(summary(model4))
 
 ##Multiple Linear Regression  
 
+Finally, two multiple linear regression models are created on the data.
+
+
 ```{r}
-model5 <-(glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train))
+model5 <-glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train)
 pander(summary(model5))
 #AIC: 29584
 ```
@@ -322,7 +331,8 @@ The characteristics and performance of the six multiple linear regression models
 
 |Model #| Type | # of Predictors|AIC|
 |---|---|---|---|
-|1|Poisson|7|31701|
+|0|Poisson|14|31705|
+|1|Poisson|11|31700|
 |2|Poisson|3|31739|
 |3|Negative Binomial|8|31705|
 |4|Negative Binomial|5|31750|
@@ -347,9 +357,10 @@ cv.errors6 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 
 for (j in 1:k) {
   
-  model1 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide
-                 + TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS, family="poisson", data=train[folds != j, ])
-  model2 <- glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family=poisson, data=train[folds != j, ])
+  model1 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
+                  TotalSulfurDioxide + LabelAppeal + AcidIndex + STARS + Alcohol + 
+                  Density + Sulphates + pH, family="poisson", data=train[folds != j, ])
+  model2 <- glm(TARGET ~ LabelAppeal + AcidIndex + STARS, family="poisson", data=train[folds != j, ])
   model3 <- glm.nb(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
                       TotalSulfurDioxide + Alcohol + AcidIndex + LabelAppeal + STARS, data=train[folds != j, ])
   model4 <- glm.nb(TARGET ~ VolatileAcidity + TotalSulfurDioxide + LabelAppeal +
@@ -357,7 +368,7 @@ for (j in 1:k) {
   model5 <- glm(TARGET ~ VolatileAcidity + Chlorides + FreeSulfurDioxide + 
                   TotalSulfurDioxide + LabelAppeal + log(AcidIndex) + STARS, family="gaussian", data=train[folds != j, ])
   model6 <- glm(TARGET ~ VolatileAcidity + FreeSulfurDioxide + TotalSulfurDioxide + 
-                  Chlorides + Density + pH + Sulphates + LabelAppeal + AcidIndex + STARS, family=gaussian, data = train[folds != j, ])
+                  Chlorides + Density + pH + Sulphates + LabelAppeal + AcidIndex + STARS, family="gaussian", data = train[folds != j, ])
   
   
     #best.fit = regsubsets(y ~ ., data = train_df[folds != j, ], nvmax = 10)
