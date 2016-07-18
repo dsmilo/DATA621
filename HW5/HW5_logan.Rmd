@@ -37,7 +37,7 @@ train <- train[-1] #remove index column
 test = read.csv("https://github.com/dsmilo/DATA621/raw/master/HW5/Data/wine-evaluation-data.csv")
 ```
 
-#DATA EXPLORATION
+#Data Exploration
 
 The data set contains 12,795 cases (no pun intended), with an indentification variable (`INDEX`), 14 predictors, and one response variable. Each case is a commerically available wine, with the response variable being the number of cases purchased by restaurants and wine shops after sampling the wine.  Of the 14 predictor variables, 12 are related to chemical preoperties of the wine, while the other two have to do with a rating and label design. 
 
@@ -106,10 +106,10 @@ density_df2 <- train
 melted2 <- melt(density_df2, id=1)
 melted2$TARGET <- factor(melted2$TARGET)
 
-ggplot(melted2, aes(TARGET, value)) + geom_boxplot(aes(fill = TARGET), alpha = 0.5) + facet_wrap(~variable, scale="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by TARGET\n")
+ggplot(melted2, aes(TARGET, value)) + geom_boxplot(aes(fill = TARGET), alpha = 0.5) + facet_wrap(~variable, scales="free") + scale_fill_discrete(guide = FALSE) + scale_y_continuous('', labels = NULL, breaks = NULL) + scale_x_discrete('') + ggtitle("Distribution of Predictors by TARGET\n")
 ```
 
-#DATA PREPARATION  
+#Data Preparation
 
 Before attempting to combine or transform any of our variables, the predictor variables with missing values must be addressed. Eight of the predictor variables have missing values, with almost a third of our cases containing an NA. As concluded from our examination of the data in the previous section, the `STARS` variable has over 3000 NA values, which are most likely associated with a 0 rating. Using this reasoning, we will replace the NA values in `STARS` with zeros. 
 
@@ -194,9 +194,11 @@ melted3 <- melt(train)
 ggplot(melted3, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Density of Variables After Casewise Deletion\n")
 ```
 
-Examinging all of the variables, there do not appear to be any values far outside of the ranges, values that are nonsensical (negative cases purchased, for example), or need to be removed before moving forward. The combination of variables, or ratios of existing predictors did not seem to yield any effective results. Log or square root transformations may help to improve models using some of the slightly skewed predictors.  
+Examinging all of the variables, there do not appear to be any values far outside of the ranges, values that are nonsensical (negative cases purchased, for example), or need to be removed before moving forward. The combination of variables, or ratios of existing predictors did not seem to yield any effective results.
 
-#MODELS
+Log or square root transformations may help to improve models using some of the slightly skewed predictors.  In particular, `AcidIndex` appears the most skewed of the predictors.  Log and square root transformations are performed to observe the change in correlation of this variable with `TARGET` --- both improve the correlation by a very small amount, but the log-transform yields a greater improvement.
+
+#Model Creation
 
 Only one response variable exists, and we will use at least two versions of three different types of models. Because the `TARGET` variable is a poisson distribution, we will create two poisson regression models, followed by two models using the negative binomial regression model, and lastly at least two using our familiar multiple linear regression model.  
 
@@ -334,7 +336,7 @@ pander(summary(model6))
 
 *Discussion of Coefficients*
 
-#MODEL SELECTION and PREDICTION  
+#Model Selection and Prediction  
 
 ##Model Comparsion
 
