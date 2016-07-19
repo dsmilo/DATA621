@@ -114,24 +114,7 @@ Regression techniques are used to predict loan approval status of customers of a
 
 Between 2009-2014, approximately 95 million mortgage loan applications were filed in the United States alone (Home Mortgage Disclosure Act, 2015). When further loan types, including education and personal loans, are considered, it becomes even clearer that the ability to accurately identify reliable borrowers is a high priority for banks and other financial institutions today. Likewise, consumers are significantly affected as well. Surveys and analyses performed by Lusardi & Scheresberg (2013) has shown that individuals of poor financial literacy, and subsequently poor credit history, are declined by banks for loans and mortgages, and turn to high-cost borrowing (i.e. payday loans). Thus, it becomes clear that the factors that determine which individuals are dependable borrowers is information important to both financial institutions and consumers alike.
 
-The dataset of interest contains information about customers of a hypothetical bank. The data for this project was obtained from a data challenge hosted at [AnalyticsVidhya](http://datahack.analyticsvidhya.com/contest/practice-problem-loan-prediction-iii)  The dataset has 614 rows (each representing a customer) and 13 predictor variables variables. Furthermore, there is 1 identification variable, and 1 response variables: `Loan_Status`, a binary categorical variable representing whether each customer has been approved for a loan given their credentials.  The class of variables read in from the dataset is presented below:
-
-```{r data-class, echo = FALSE}
-train_var = train
-train_var$Property_Area = as.factor(train_var$Property_Area)
-var_class <- data.frame(Class = rep(NA, ncol(train_var) - 1), Levels = rep(NA, ncol(train_var) - 1), stringsAsFactors = FALSE, check.names = FALSE, row.names = names(train_var)[-1])
-names(var_class) = c("Class", "Levels/Range")
-
-for(i in 2:ncol(train_var)) {
-  var_class[i - 1, 1] <- class(train_var[, i])
-  val = length(levels(train_var[, i]))
-  if (val == 0) {
-    val = paste0(floor(min(train_var[, i], na.rm = TRUE)), " - ", max(train_var[, i], na.rm = TRUE))
-  }
-  var_class[i - 1, 2] <- val
-}
-pander(var_class)
-```
+The dataset of interest contains information about customers of a hypothetical bank. The data for this project was obtained from a data challenge hosted at [AnalyticsVidhya](http://datahack.analyticsvidhya.com/contest/practice-problem-loan-prediction-iii).
 
 
 ##Literature Review
@@ -161,6 +144,32 @@ grid.raster(img)
 ```
 
 ##Methodology
+  The dataset has 614 rows (each representing a customer) and 13 predictor variables variables. Furthermore, there is 1 identification variable, and 1 response variables: `Loan_Status`, a binary categorical variable representing whether each customer has been approved for a loan given their credentials.  The class of variables read in from the dataset is presented below:
+
+```{r data-class, echo = FALSE}
+train_var = train
+train_var$Property_Area = as.factor(train_var$Property_Area)
+var_class <- data.frame(Class = rep(NA, ncol(train_var) - 1), Levels = rep(NA, ncol(train_var) - 1), stringsAsFactors = FALSE, check.names = FALSE, row.names = names(train_var)[-1])
+names(var_class) = c("Class", "Levels/Range")
+
+for(i in 2:ncol(train_var)) {
+  var_class[i - 1, 1] <- class(train_var[, i])
+  val = length(levels(train_var[, i]))
+  if (val == 0) {
+    val = paste0(floor(min(train_var[, i], na.rm = TRUE)), " - ", max(train_var[, i], na.rm = TRUE))
+  }
+  var_class[i - 1, 2] <- val
+}
+pander(var_class)
+```
+
+###Data Exploration
+
+
+###Data Manipulation
+
+
+###Model Creation
 
 In total, six models were created and used for prediction of the target variable. A tool was supplied by AnalyticsVidhya that reported accuracy (% of cases correctly predicted) upon submission of the test data predictions.
 
