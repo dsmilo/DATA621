@@ -164,7 +164,23 @@ pander(var_class)
 ```
 
 ###Data Exploration
+```{r}
+#Continuous Variables
 
+cont_vars <- train_var %>% dplyr::select(c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term, TotalIncome, LTI))
+
+melted <- melt(cont_vars)
+
+ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Distribution of Continuous Variables \n")
+
+#Discrete Variables
+poisson_vars <- train_var %>% dplyr::select(-c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term, TotalIncome, LTI, Property_Area))
+
+melted <- melt(poisson_vars)
+
+ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Distribution of Discrete Variables \n")
+
+```
 
 ###Data Manipulation
 
