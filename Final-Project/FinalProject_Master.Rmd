@@ -104,10 +104,10 @@ test = test2
 
 
 ##Abstract
-Regression techniques are used to predict loan approval status of customers of a fictional bank given a number of predictors.  Techniques utilized include logistic regression, ridge regression, the Adaboost algorithm, and neural networks.  The optimal model created yields an accuracy of 0.8056.
+Regression and classification techniques are used to predict loan approval status of customers of a fictional bank given fourteen predictors. Data was obtained from a "data challenge", and the given variables were supplemented with transformations. Models were trained on a dataset of 614 cases, and subsequently used to predict the binary outcome of 367 test cases. Techniques utilized include logistic regression, ridge regression, the Adaboost algorithm, and a neural network. Analyses were performed to determine the optimal number of iterations and optimal number of nodes for the Adaboost algorithm and neural network, respectively. Cross validation results were not linearly co-variant with accuracy scores on the test data set. Using tools supplied by the data challenge, accuracy scores were used to compare models and the Adaboost algorithm was found to produce the best results. The optimal model created yielded an accuracy of 0.8056.
 
 
-####Keywords:
+####Keywords: loan prediction, classification, regression, adaboost
 
 \newpage
 ##Introduction
@@ -142,6 +142,8 @@ download.file("https://cs231n.github.io/assets/nn1/neural_net2.jpeg", "nn1.jpeg"
 img <- read.jpeg("nn1.jpeg")
 grid.raster(img)
 ```
+
+Given the fact that loan prediction has traditionally been a field of interest for those who can benefit from financial gain (i.e. big banks, as opposed to academia), research and methodological studies in this area is sparse. Most of the current literature in this area has been focused on financial solvency issues, namely bankruptcy. It has been found previously that logistic regression, neural networks, and classification trees are the three most commonly used data mining methods in the prediction of bankruptcy (Olson et al., 2012). As a means of extending this work to the arena of personal loans, this project serves to compare some of the most commonly used methods of prediction in loan outcomes. We believe that the information and methods investigated here can trickle down to a smaller scale and be beneficial to smaller economies such as microlending, where loans tend to be oriented around civilian populations instead of financial institutions (Conlin, 1999).
 
 ##Methodology
   The dataset has 614 rows (each representing a customer) and 13 predictor variables variables. Furthermore, there is 1 identification variable, and 1 response variables: `Loan_Status`, a binary categorical variable representing whether each customer has been approved for a loan given their credentials.  The class of variables read in from the dataset is presented below:
@@ -299,6 +301,8 @@ At the time of writing this report, we are currently tied for ${8}^{th}$ place o
 
 Agbemava, E., Nyarko, I. K., Adade, T. C., & Bediako, A. K. (2016). Logistic Regression Analysis Of Predictors Of Loan Defaults By Customers Of Non-Traditional Banks In Ghana. European Scientific Journal, 12(1).
 
+Conlin, M. (1999). Peer group micro-lending programs in Canada and the United States. Journal of Development Economics, 60(1), 249-269.
+
 Cule, E., & De Iorio, M. (2012). A semi-automatic method to guide the choice of ridge parameter in ridge regression. arXiv preprint arXiv:1205.0686.
 
 Dobbin, K. K., & Simon, R. M. (2011). Optimally splitting cases for training and testing high dimensional classifiers. BMC medical genomics, 4(1), 1.
@@ -308,6 +312,8 @@ Günther, F., & Fritsch, S. (2010). neuralnet: Training of neural networks. The 
 "Home Mortgage Disclosure Act." Consumer Financial Protection Bureau: An Official Website of the United States Government. Consumer Financial Protection Bureau, n.d. Web. 17 July 2016. <http://www.consumerfinance.gov/data-research/hmda/>.
 
 Lusardi, A., & Scheresberg, C. D. B. (2013). Financial literacy and high-cost borrowing in the United States (No. w18969). National Bureau of Economic Research.
+
+Olson, D. L., Delen, D., & Meng, Y. (2012). Comparative analysis of data mining methods for bankruptcy prediction. Decision Support Systems, 52(2), 464-473.
 
 Thomas, L. C. (2000). A survey of credit and behavioural scoring: forecasting financial risk of lending to consumers. International journal of forecasting, 16(2), 149-172.
 
