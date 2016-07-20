@@ -146,7 +146,7 @@ grid.raster(img)
 Given the fact that loan prediction has traditionally been a field of interest for those who can benefit from financial gain (i.e. big banks, as opposed to academia), research and methodological studies in this area is sparse. Most of the current literature in this area has been focused on financial solvency issues, namely bankruptcy. It has been found previously that logistic regression, neural networks, and classification trees are the three most commonly used data mining methods in the prediction of bankruptcy (Olson et al., 2012). As a means of extending this work to the arena of personal loans, this project serves to compare some of the most commonly used methods of prediction in loan outcomes. We believe that the information and methods investigated here can trickle down to a smaller scale and be beneficial to smaller economies such as microlending, where loans tend to be oriented around civilian populations instead of financial institutions (Conlin, 1999).
 
 ##Methodology
-  The dataset has 614 rows (each representing a customer) and 13 predictor variables variables. Furthermore, there is 1 identification variable, and 1 response variables: `Loan_Status`, a binary categorical variable representing whether each customer has been approved for a loan given their credentials.  The class of variables read in from the dataset is presented below:
+  The dataset has 614 rows (each representing a customer) and 11 predictor variables. Furthermore, there is 1 identification variable, and 1 response variable: `Loan_Status`, a binary categorical variable representing whether each customer has been approved for a loan given their credentials.  The class of variables read in from the dataset is presented below:
 
 ```{r data-class, echo = FALSE}
 train_var = train
@@ -184,16 +184,19 @@ ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alph
 
 ```
 
-###Data Manipulation
+###Data Manipulation    
 
+The supplied training dataset originally has 11 predictor variables, six of which are character vectors which needed to be converted to binary categorical variables. The response variable, stated as a simple "Y/N" was also converted into the 0 or 1 format for modelling. As it was deemed not significant and  also not chosen by any automated model, `Rural` is excluded from the `Property_Area` predictor, leaving only `Urban` and `SemiUrban`, which are turned into separate binary categorical predictors. `Property_Area` is then excluded from the training dataset.
+
+All other variables in the dataset were numeric, or already in a binary format. Given the included variables, two new features were created. `Total Income` is the sum of applicant and co-applicant incomes, and `LTI` (Loan to Income Ratio) is the loan amount ($\times$ 1000) divided by the `ApplicantIncome` variable. 
+
+Missing values were also present in the data, either in the form of empty characters (`""`), or `NA`s. Four of the predictors, `Gender`, `Married`, `Dependents`, and `Self_Employed` contained empty characters. Being only a small proportion of the cases (< 1% to 5%), these were in a way imputed when the predictors were converted into binary categorical variables. Four other variables, `LoanAmount`, `Loan_Amount_Term`, `Credit_History`, and `LTI` all contained small numbers of `NA`s. These are either dropped from the dataset, or imputed with the median, depending on the model. Alternative imputation methods, such as filling with a weighted "coin toss" value yielded less accurate results in the models. 
 
 ###Model Creation
 
 In total, six models were created and used for prediction of the target variable. A tool was supplied by AnalyticsVidhya that reported accuracy (% of cases correctly predicted) upon submission of the test data predictions.
 
-Given the variables in the data, two new features were created: `Total Income` and `LTI` (Loan to Income Ratio). The `Urban` and `SemiUrban` variables were created from the `Property_Type` variable, and the `Property_Type` varible was excluded from further analyses. As all other data were numeric, or binary factors converted to numeric, these data worked well for logistic regression.
-
-Logistic regression is a very common method of classifying data (Thomas, 2000). In logistic regression, a linear regression is used where the dependent variable is a non-linear function of the probability of the event occuring. In this project, the purpose of the logistic regression method is to classify cases as either "Approved for loan" or "Denied". The general logistic regression model can be represented as: 
+Logistic regression is a very common method of classifying data (Thomas, 2000). In logistic regression, a linear regression is used where the dependent variable is a non-linear function of the probability of the event occurring. In this project, the purpose of the logistic regression method is to classify cases as either "Approved for loan" or "Denied". The general logistic regression model can be represented as: 
 
 $$\ln { \frac { { p }_{ i } }{ 1-{ p }_{ i } }  } ={ \beta  }_{ 0 }+{ \beta  }_{ 1 }{ X }_{ 1 }+...+{ \beta  }_{ n }{ X  }_{ n } +{ \varepsilon }$$
 
