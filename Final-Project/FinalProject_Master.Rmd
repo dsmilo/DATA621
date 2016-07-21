@@ -270,7 +270,7 @@ grid.raster(img)
 ####Accuracy
 The results obtained are summarized as follows:
 ```{r, echo = FALSE}
-data_results = data.frame(Model = c("ada package", "Best Subsets", "Logistic Ridge", "Full Model, Binomial", "Full Model, Poisson", "Neural Network (neuralnet package)", "Manually implemented adaboost algorithm"), Accuracy = c("0.8055", "0.7778", "0.7708", "0.7638", "0.7708", "0.7431", "0.7153"))
+data_results = data.frame(Model = c("ada package", "Best Subsets", "Logistic Ridge", "Full Model, Binomial", "Full Model, Poisson", "Neural Network (neuralnet package)", "Manually implemented adaboost algorithm"), Accuracy = c("0.8055", "0.7778", "0.7708", "0.7638", "0.7708", "0.7431", "0.7153"), stringsAsFactors = FALSE)
 data_results2 = data_results[order(data_results$Accuracy, decreasing = TRUE),]
 kable(data_results2)
 ```
@@ -309,8 +309,8 @@ grid.raster(img)
 The 10-Fold Cross-Validation approach was used again to determine which model produced the lowest error on unseen training data. This data is compared in the section below to the accuracy on test set data. A summary of the mean CV error for each model is shown here:
 
 ```{r, echo = FALSE}
-mean_cv_results = read.csv("https://github.com/aadikalloo/AadiMSDA/raw/master/IS621-Data-Mining/allcverror.csv")
-mean_cv = mean_cv_results[order(mean_cv_results$Mean.CV.Error),]
+mean_cv_results = read.csv("https://github.com/aadikalloo/AadiMSDA/raw/master/IS621-Data-Mining/allcverror.csv", check.names = FALSE)
+mean_cv = mean_cv_results[order(mean_cv_results$"Mean CV Error"),]
 row.names(mean_cv) = NULL
 pander(mean_cv)
 ```
@@ -323,7 +323,12 @@ Many data mining methods were explored for this project. It was determined that 
 Here the relationship between the Cross Validation error on training data and accuracy on the test data is shown:
 
 ```{r, echo = FALSE}
-plot(y = as.numeric(as.character(data_results2$Accuracy[1:6])), x = mean_cv$Mean.CV.Error, type = "p", xlab = "Mean CV Error", ylab = "Accuracy", main = "Relationship between Training Set CV Error and Test Set Accuracy")
+plot(y = as.numeric(data_results2$Accuracy[1:6]), x = mean_cv$"Mean CV Error", type = "p", xlab = "Mean CV Error", ylab = "Accuracy", main = "Relationship between Training Set CV Error and Test Set Accuracy")
+
+acc_cv <- data.frame(Accuracy = as.numeric(data_results2$Accuracy[1:6]), CV = mean_cv$"Mean CV Error")
+rownames(acc_cv) <- c("Adaboost", "Subset Logistic", "Logistic Ridge", "Full Poisson", "Full Binomial", "Neural Network")
+
+ggplot(acc_cv, aes(x = CV, y = Accuracy)) + geom_point() + geom_text(aes(label=rownames(acc_cv)), vjust="inward", hjust = "inward", check_overlap = TRUE) + geom_smooth(alpha = 0.25, method = glm, fill = 3, col = 3, se=FALSE, lty=3) + scale_x_continuous('Mean Cross-Validation Error') + ggtitle('Relationship between Training Set CV Error and Test Set Accuracy\n') + theme(plot.title = element_text(lineheight=.8, face="bold")) + geom_smooth(alpha = 0.25, method = "loess", se=FALSE, lwd = 1, lty = 3) 
 ```
 
 While this plot does indicate a general negative relationship between mean CV error and test data accuracy (i.e. as CV error increases, test accuracy decreases), the sample is too small to determine whether or not this data is linear or follows a higher order relationship.
