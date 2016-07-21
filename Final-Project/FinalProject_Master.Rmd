@@ -132,7 +132,7 @@ $$o(x)=f({ w }_{ 0 }+\sum _{ j=1 }^{ J }{ { w }_{ j }\cdot f({ w }_{ 0j }+\sum _
 
 where ${w}_{0}$ is the intercept of the output neuron, ${w}_{0j}$ is the intercept of the ${j}^{th}$ hidden neuron, and ${w}_{j}$ is the synaptic weight.This mathematical model can be expressed visually, and is depicted in the following figure: 
 
-```{r fig.width=4, fig.height=2,echo=FALSE, eval = TRUE}
+```{r fig.width=4, fig.height=2,echo=FALSE, eval = FALSE, error=FALSE}
 #This mathematical model can be expressed visually, and is depicted in the following figure:
 #![](http://neuralnetworksanddeeplearning.com/images/tikz10.png)
 
@@ -147,15 +147,18 @@ grid.raster(img)
 Given the fact that loan prediction has traditionally been a field of interest for those who can benefit from financial gain (i.e. big banks, as opposed to academia), research and methodological studies in this area is sparse. Most of the current literature in this area has been focused on financial solvency issues, namely bankruptcy. It has been found previously that logistic regression, neural networks, and classification trees are the three most commonly used data mining methods in the prediction of bankruptcy (Olson et al., 2012). As a means of extending this work to the arena of personal loans, this project serves to compare some of the most commonly used methods of prediction in loan outcomes. We believe that the information and methods investigated here can trickle down to a smaller scale and be beneficial to smaller economies such as microlending, where loans tend to be oriented around civilian populations instead of financial institutions (Conlin, 1999).
 
 ##Methodology
-  The dataset has 614 rows (each representing a customer) and 11 predictor variables. Furthermore, there is 1 identification variable, and 1 response variable: `Loan_Status`, a binary categorical variable representing whether each customer has been approved for a loan given their credentials.  The class of variables read in from the dataset is presented below:
+  The dataset has 614 rows (each representing a customer) and 11 predictor variables. Furthermore, there is 1 identification variable, and 1 response variable: `Loan_Status`, a binary categorical variable representing whether each customer has been approved for a loan given their credentials.  The goal of the data challenge and of this investigation is to predict the approval of loan applications based on the predictors.
+
+###Data Exploration
+The classes of the predictor and response variables are presented below:
 
 ```{r data-class, echo = FALSE}
 train_var = train
 train_var$Property_Area = as.factor(train_var$Property_Area)
-var_class <- data.frame(Class = rep(NA, ncol(train_var) - 1), Levels = rep(NA, ncol(train_var) - 1), stringsAsFactors = FALSE, check.names = FALSE, row.names = names(train_var)[-1])
+var_class <- data.frame(Class = rep(NA, ncol(train_var) - 4), Levels = rep(NA, ncol(train_var) - 4), stringsAsFactors = FALSE, check.names = FALSE, row.names = names(train_var)[1:(ncol(train_var) - 4)])
 names(var_class) = c("Class", "Levels/Range")
 
-for(i in 2:ncol(train_var)) {
+for(i in 1:(ncol(train_var)-3)) {
   var_class[i - 1, 1] <- class(train_var[, i])
   val = length(levels(train_var[, i]))
   if (val == 0) {
@@ -166,26 +169,49 @@ for(i in 2:ncol(train_var)) {
 pander(var_class)
 ```
 
-###Data Exploration
+It can be seen that four of the predictors are continuous variables; the remaining 7 predictors, as well as the response, are categorical variables, with all but one of these variables (`Dependents`) being binary.  The distributions of the continuous predictors are presented below:
+
 ```{r}
 #Continuous Variables
 
-cont_vars <- train_var %>% dplyr::select(c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term, TotalIncome, LTI))
+cont_vars <- train_var %>% dplyr::select(c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term))
 
 melted <- melt(cont_vars)
 
-ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Distribution of Continuous Variables \n")
+ggplot(melted, aes(value)) + geom_density(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scales="free") + scale_y_continuous('', labels=NULL) + ggtitle("Distribution of Continuous Predictors \n") + theme(axis.ticks = element_blank())
+```
 
+It is clear that each of the continuous variables exhibits a strong level of skewness -- `ApplicantIncome`, `CoapplicantIncome`, and `LoanAmount` are right-skewed, while `Loan_Amount_Term` is left-skewed,  It can be seen that the peak in the distribution of `Loan_Amount_Term` is located at 360 -- this corresponds to 30 years, the typical length of a mortgage.
+
+The distributions of the discrete predictors, as well as the target, are presented below:
+```{r}
 #Discrete Variables
-poisson_vars <- train_var %>% dplyr::select(-c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term, TotalIncome, LTI, Property_Area))
+train_var$Property_Area <- as.numeric(train_var$Property_Area)
+poisson_vars <- train_var %>% dplyr::select(-c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term, TotalIncome, LTI, Urban, SemiUrban))
 
 melted <- melt(poisson_vars)
 
-ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Distribution of Discrete Variables \n")
-
-#Missing values
-aggr(train_var, plot=TRUE, sortVars = TRUE, numbers=TRUE, cex.lab  = TRUE)
+library(scales)
+ggplot(melted, aes(value, y = 6 * ..count../sum(..count..))) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scales="free_x") + scale_y_continuous('', labels=percent) + ggtitle("Distribution of Discrete Predictors \n")
 ```
+
+The last figure in the chart shows that roughly 75% of loan applicants are approved for a loan.
+
+With the exception of `Property_Area`, each of the discrete predictors exhibits a dominant category.  The distributions indicate that, with all other variables held constant, typical applicants:
+
+  * Are male
+  
+  * Are married
+  
+  * Have no children
+  
+  * Are graduates
+  
+  * Are not self-employed
+  
+  * Meet the firm's credit requirements
+
+Inspection of the faw dataset reveals that there are a number of missing values; these are addressed prior to the development of predictive models.
 
 ###Data Manipulation    
 
@@ -193,7 +219,11 @@ The supplied training dataset originally has 11 predictor variables, six of whic
 
 All other variables in the dataset were numeric, or already in a binary format. Given the included variables, two new features were created. `Total Income` is the sum of applicant and co-applicant incomes, and `LTI` (Loan to Income Ratio) is the loan amount ($\times$ 1000) divided by the `ApplicantIncome` variable. 
 
-Missing values were also present in the data, either in the form of empty characters (`""`), or `NA`s. Four of the predictors, `Gender`, `Married`, `Dependents`, and `Self_Employed` contained empty characters. Being only a small proportion of the cases (< 1% to 5%), these were in a way imputed when the predictors were converted into binary categorical variables. Four other variables, `LoanAmount`, `Loan_Amount_Term`, `Credit_History`, and `LTI` all contained small numbers of `NA`s. These are either dropped from the dataset, or imputed with the median, depending on the model. Alternative imputation methods, such as filling with a weighted "coin toss" value yielded less accurate results in the models. 
+Missing values were also present in the data, either in the form of empty characters (`""`), or `NA`s. Four of the predictors, `Gender`, `Married`, `Dependents`, and `Self_Employed` contained empty characters. Being only a small proportion of the cases (< 1% to 8%), these were in a way imputed when the predictors were converted into binary categorical variables. Four other variables, `LoanAmount`, `Loan_Amount_Term`, `Credit_History`, and `LTI` all contained small numbers of `NA`s. These are either dropped from the dataset, or imputed with the median, depending on the model. Alternative imputation methods, such as filling with a weighted "coin toss" value yielded less accurate results in the models.  A representation of the proportion of missing values is presented below:
+
+```{r, fig.height=4}
+aggr(train_var, plot=TRUE, sortVars = TRUE, numbers=TRUE, cex.lab  = TRUE)
+```
 
 ###Model Creation
 
@@ -222,7 +252,7 @@ plot(x = nn_df$Nodes, y = nn_df$Mean.CV.Error, xlab = "Nodes", ylab = "Mean CV E
 
 From the above data, a network of 10 nodes was chosen due to its minimal cross validation error and the illustration of the network used for prediction of the target variable is included here:
 
-```{r fig.width=6, fig.height=4,echo=FALSE, eval = TRUE}
+```{r fig.width=6, fig.height=4,echo=FALSE, eval = FALSE}
 #This mathematical model can be expressed visually, and is depicted in the following figure:
 #![](http://neuralnetworksanddeeplearning.com/images/tikz10.png)
 
@@ -261,7 +291,7 @@ Optimal accuracy was attained at 125 iterations, with a steady decline and plate
 
 ROC curves for the linear regression models were created and are displayed here. 
 
-```{r fig.width=10, fig.height=6, echo=FALSE, eval = TRUE}
+```{r fig.width=10, fig.height=6, echo=FALSE, eval = FALSE}
 #This mathematical model can be expressed visually, and is depicted in the following figure:
 #![](http://neuralnetworksanddeeplearning.com/images/tikz10.png)
 
