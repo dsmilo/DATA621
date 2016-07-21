@@ -217,7 +217,16 @@ Inspection of the raw data set reveals that there are a number of missing values
 
 The supplied training data set originally has 11 predictor variables, six of which are character vectors which needed to be converted to binary categorical variables. The response variable, stated as a simple "Y/N" was also converted into the 0 or 1 format for modelling. As it was deemed not significant and  also not chosen by any automated model, `Rural` is excluded from the `Property_Area` predictor, leaving only `Urban` and `SemiUrban`, which are turned into separate binary categorical predictors. `Property_Area` is then excluded from the training dataset.
 
-All other variables in the data set were numeric, or already in a binary format. Given the included variables, two new features were created. `Total Income` is the sum of applicant and co-applicant incomes, and `LTI` (Loan to Income Ratio) is the loan amount ($\times$ 1000) divided by the `ApplicantIncome` variable. 
+All other variables in the data set were numeric, or already in a binary format. Given the included variables, two new features were created. `TotalIncome` is the sum of applicant and co-applicant incomes, and `LTI` (Loan to Income Ratio) is the loan amount ($\times$ 1000) divided by the `ApplicantIncome` variable.  The distributions of thse created variables are shown below; they exhibit a similar degree of right-skewness as the three continuous predictors used to create them.
+
+```{r, fig.height=2.5}
+created_vars <- train_var %>% dplyr::select(c(TotalIncome, LTI))
+
+melted <- melt(created_vars)
+
+ggplot(melted, aes(value)) + geom_density(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scales="free") + scale_y_continuous('', labels=NULL) + ggtitle("Distribution of Created Predictors \n") + theme(axis.ticks = element_blank())
+
+```
 
 Missing values were also present in the data, either in the form of empty characters (`""`), or `NA`s. Four of the predictors, `Gender`, `Married`, `Dependents`, and `Self_Employed` contained empty characters. Being only a small proportion of the cases (< 1% to 8%), these were in a way imputed when the predictors were converted into binary categorical variables. Four other variables, `LoanAmount`, `Loan_Amount_Term`, `Credit_History`, and `LTI` all contained small numbers of `NA`s. These are either dropped from the dataset, or imputed with the median, depending on the model. Alternative imputation methods, such as filling with a weighted "coin toss" value yielded less accurate results in the models.  A representation of the proportion of missing values is presented below:
 
