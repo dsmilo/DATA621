@@ -115,7 +115,7 @@ Regression and classification techniques are used to predict loan approval statu
 
 Between 2009-2014, approximately 95 million mortgage loan applications were filed in the United States alone (Home Mortgage Disclosure Act, 2015). When further loan types, including education and personal loans, are considered, it becomes even clearer that the ability to accurately identify reliable borrowers is a high priority for banks and other financial institutions today. Likewise, consumers are significantly affected as well. Surveys and analyses performed by Lusardi & Scheresberg (2013) has shown that individuals of poor financial literacy, and subsequently poor credit history, are declined by banks for loans and mortgages, and turn to high-cost borrowing (i.e. payday loans). Thus, it becomes clear that the factors that determine which individuals are dependable borrowers is information important to both financial institutions and consumers alike.
 
-The dataset of interest contains information about customers of a hypothetical bank. The data for this project was obtained from a data challenge hosted at [AnalyticsVidhya](http://datahack.analyticsvidhya.com/contest/practice-problem-loan-prediction-iii).
+The dataset of interest contains information about customers of a hypothetical bank and was obtained from a data challenge hosted at [AnalyticsVidhya](http://datahack.analyticsvidhya.com/contest/practice-problem-loan-prediction-iii). This data set and challenge were chosen due to its relevance to the current loan-centric economy outlined above, and to address the need for more transparent analyses of optimal methods for financially-related prediction models.
 
 
 ##Literature Review
@@ -171,7 +171,7 @@ pander(var_class)
 
 It can be seen that four of the predictors are continuous variables; the remaining 7 predictors, as well as the response, are categorical variables, with all but one of these variables (`Dependents`) being binary.  The distributions of the continuous predictors are presented below:
 
-```{r}
+```{r, fig.height=3.5}
 #Continuous Variables
 
 cont_vars <- train_var %>% dplyr::select(c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term))
@@ -184,7 +184,7 @@ ggplot(melted, aes(value)) + geom_density(aes(fill = variable, col = variable), 
 It is clear that each of the continuous variables exhibits a strong level of skewness -- `ApplicantIncome`, `CoapplicantIncome`, and `LoanAmount` are right-skewed, while `Loan_Amount_Term` is left-skewed,  It can be seen that the peak in the distribution of `Loan_Amount_Term` is located at 360 -- this corresponds to 30 years, the typical length of a mortgage.
 
 The distributions of the discrete predictors, as well as the target, are presented below:
-```{r}
+```{r, fig.height = 4.5}
 #Discrete Variables
 train_var$Property_Area <- as.numeric(train_var$Property_Area)
 poisson_vars <- train_var %>% dplyr::select(-c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term, TotalIncome, LTI, Urban, SemiUrban))
@@ -211,18 +211,18 @@ With the exception of `Property_Area`, each of the discrete predictors exhibits 
   
   * Meet the firm's credit requirements
 
-Inspection of the faw dataset reveals that there are a number of missing values; these are addressed prior to the development of predictive models.
+Inspection of the raw data set reveals that there are a number of missing values; these are addressed prior to the development of predictive models.
 
 ###Data Manipulation    
 
-The supplied training dataset originally has 11 predictor variables, six of which are character vectors which needed to be converted to binary categorical variables. The response variable, stated as a simple "Y/N" was also converted into the 0 or 1 format for modelling. As it was deemed not significant and  also not chosen by any automated model, `Rural` is excluded from the `Property_Area` predictor, leaving only `Urban` and `SemiUrban`, which are turned into separate binary categorical predictors. `Property_Area` is then excluded from the training dataset.
+The supplied training data set originally has 11 predictor variables, six of which are character vectors which needed to be converted to binary categorical variables. The response variable, stated as a simple "Y/N" was also converted into the 0 or 1 format for modelling. As it was deemed not significant and  also not chosen by any automated model, `Rural` is excluded from the `Property_Area` predictor, leaving only `Urban` and `SemiUrban`, which are turned into separate binary categorical predictors. `Property_Area` is then excluded from the training dataset.
 
-All other variables in the dataset were numeric, or already in a binary format. Given the included variables, two new features were created. `Total Income` is the sum of applicant and co-applicant incomes, and `LTI` (Loan to Income Ratio) is the loan amount ($\times$ 1000) divided by the `ApplicantIncome` variable. 
+All other variables in the data set were numeric, or already in a binary format. Given the included variables, two new features were created. `Total Income` is the sum of applicant and co-applicant incomes, and `LTI` (Loan to Income Ratio) is the loan amount ($\times$ 1000) divided by the `ApplicantIncome` variable. 
 
 Missing values were also present in the data, either in the form of empty characters (`""`), or `NA`s. Four of the predictors, `Gender`, `Married`, `Dependents`, and `Self_Employed` contained empty characters. Being only a small proportion of the cases (< 1% to 8%), these were in a way imputed when the predictors were converted into binary categorical variables. Four other variables, `LoanAmount`, `Loan_Amount_Term`, `Credit_History`, and `LTI` all contained small numbers of `NA`s. These are either dropped from the dataset, or imputed with the median, depending on the model. Alternative imputation methods, such as filling with a weighted "coin toss" value yielded less accurate results in the models.  A representation of the proportion of missing values is presented below:
 
-```{r, fig.height=4}
-aggr(train_var, plot=TRUE, sortVars = TRUE, numbers=TRUE, cex.lab  = TRUE)
+```{r, message = FALSE, warning = FALSE, tidy = TRUE, fig.height=4}
+aggr(train_var, plot=TRUE, sortVars = FALSE, numbers=TRUE, cex.lab  = TRUE)
 ```
 
 ###Model Creation
@@ -244,24 +244,26 @@ The Adaboost algorithm was used for this project in two forms. The first was thr
 
 A simple neural network method was pursued. The neural network approach was performed using normalized data with a single hidden layer. The number of nodes to use in the hidden layer was determined using a 10-fold Cross Validation Approach. A plot of the mean CV error against the number of hidden nodes is shown below:
 
-```{r, echo = FALSE}
+```{r, fig.height=3, echo = FALSE}
+#par(mfrow = c(1, 2))
 nn_df = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/nn_df.csv")
-plot(x = nn_df$Nodes, y = nn_df$Mean.CV.Error, xlab = "Nodes", ylab = "Mean CV Error", main = "Determination of Number of Nodes for neuralnet")
+plot(x = nn_df$Nodes, y = nn_df$Mean.CV.Error, xlab = "Nodes", ylab = "Mean CV Error", main = "Determination of Number of Nodes for neuralnet", pch = ifelse(nn_df$Nodes==10, 19, 1))
+
 ```
 
 
-From the above data, a network of 10 nodes was chosen due to its minimal cross validation error and the illustration of the network used for prediction of the target variable is included here:
+From the above data, a network of 10 nodes was chosen due to its minimal cross validation error. This resulted in a network where the input variables were each sent to the 10 hidden nodes where weights were applied based on the variable's signifiance, and then sent to an output node that used its own weight to output the target variable classification. The illustration of the network used for prediction of the target variable is included here:
 
-```{r fig.width=6, fig.height=4,echo=FALSE, eval = FALSE}
+```{r fig.width=7, fig.height=3.5,echo=FALSE, eval = TRUE}
 #This mathematical model can be expressed visually, and is depicted in the following figure:
 #![](http://neuralnetworksanddeeplearning.com/images/tikz10.png)
-
 
 library(ReadImages) #Had to install manually
 library(grid)
 download.file("https://github.com/aadikalloo/AadiMSDA/raw/master/IS621-Data-Mining/nn2.jpg", "nn2.jpeg")
 img <- read.jpeg("nn2.jpeg")
 grid.raster(img)
+
 ```
 
 
@@ -277,11 +279,13 @@ kable(data_results2)
 
 It can be seen that the best results were achieved through use of the `ada` package. The following figure illustrates the results of an analysis of test data accuracy against iterations of the `ada` function:
 
-```{r, echo = FALSE}
+```{r, fig.height=3, echo = FALSE}
 ada_results = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/ada.csv", header = FALSE)
 names(ada_results) = c("Iterations", "Accuracy")
-plot(x = ada_results$Iterations, y = ada_results$Accuracy, xlab = "Iterations", ylab = "Accuracy", ylim = c(0.72, 0.82), main = "Effect of number of iteratons on test data accuracy")
+plot(x = ada_results$Iterations, y = ada_results$Accuracy, xlab = "Iterations", ylab = "Accuracy", ylim = c(0.72, 0.82), main = "Effect of number of iteratons on test data accuracy", pch = ifelse(ada_results$Accuracy == 0.8055, 19, 1))
 lines(smooth.spline(x = ada_results$Iterations, y = ada_results$Accuracy))
+
+
 ```
 
 Optimal accuracy was attained at 125 iterations, with a steady decline and plateau thereafter. These results were in keeping with our hypothesis, however it was expected that the peak accuracy would occur at a higher iteration.
@@ -291,7 +295,7 @@ Optimal accuracy was attained at 125 iterations, with a steady decline and plate
 
 ROC curves for the linear regression models were created and are displayed here. 
 
-```{r fig.width=10, fig.height=6, echo=FALSE, eval = FALSE}
+```{r fig.width=10, fig.height=6, echo=FALSE, eval = TRUE}
 #This mathematical model can be expressed visually, and is depicted in the following figure:
 #![](http://neuralnetworksanddeeplearning.com/images/tikz10.png)
 
@@ -303,11 +307,13 @@ img <- read.jpeg("roc.jpeg")
 grid.raster(img)
 ```
 
+The ROC curves shown here illustrate that the performance of the four binary classifiers represented do not vary greatly from one another -- all classifiers show an Area Under the Curve (AUC) value of approximately 0.8. However, as shown in the table above, the accuracy of these classifiers vary greatly on the test data with a maximum and minimum of the four listed here being 0.7778 and 0.7638, respectively. While this may seem to be a difference of "only"  0.014 on test data accuracy, this translates to a differences of approximately 80 places in the data challenge rankings. This is a potent example of the importance of seemingly miniscule improvements in prediction models.
 
 ####10-Fold Cross-Validation 
 
-The 10-Fold Cross-Validation approach was used again to determine which model produced the lowest error on unseen training data. This data is compared in the section below to the accuracy on test set data. A summary of the mean CV error for each model is shown here:
-
+The 10-Fold Cross-Validation approach was used again to determine which model produced the lowest error on training data. This method was chosen as it allows all observations to be used for both training and validation, while also allowing each model to be tested on unseen data. These results are compared in the Discussion section below to the accuracy on test set data. A summary of the mean CV error for each model is shown here:
+                        
+&nbsp;
 ```{r, echo = FALSE}
 mean_cv_results = read.csv("https://github.com/aadikalloo/AadiMSDA/raw/master/IS621-Data-Mining/allcverror.csv", check.names = FALSE)
 mean_cv = mean_cv_results[order(mean_cv_results$"Mean CV Error"),]
@@ -323,19 +329,30 @@ Many data mining methods were explored for this project. It was determined that 
 Here the relationship between the Cross Validation error on training data and accuracy on the test data is shown:
 
 ```{r, echo = FALSE}
-plot(y = as.numeric(data_results2$Accuracy[1:6]), x = mean_cv$"Mean CV Error", type = "p", xlab = "Mean CV Error", ylab = "Accuracy", main = "Relationship between Training Set CV Error and Test Set Accuracy")
+#plot(y = as.numeric(data_results2$Accuracy[1:6]), x = mean_cv$"Mean CV Error", type = "p", xlab = "Mean CV Error", ylab = "Accuracy", main = "Relationship between Training Set CV Error and Test Set Accuracy")
 
 acc_cv <- data.frame(Accuracy = as.numeric(data_results2$Accuracy[1:6]), CV = mean_cv$"Mean CV Error")
-rownames(acc_cv) <- c("Adaboost", "Subset Logistic", "Logistic Ridge", "Full Poisson", "Full Binomial", "Neural Network")
+rownames(acc_cv) <- c("Adaboost", "Best Subsets Logistic", "Logistic Ridge", "Full Poisson", "Full Binomial", "Neural Network")
 
 ggplot(acc_cv, aes(x = CV, y = Accuracy)) + geom_point() + geom_text(aes(label=rownames(acc_cv)), vjust="inward", hjust = "inward", check_overlap = TRUE) + geom_smooth(alpha = 0.25, method = glm, fill = 3, col = 3, se=FALSE, lty=3) + scale_x_continuous('Mean Cross-Validation Error') + ggtitle('Relationship between Training Set CV Error and Test Set Accuracy\n') + theme(plot.title = element_text(lineheight=.8, face="bold")) + geom_smooth(alpha = 0.25, method = "loess", se=FALSE, lwd = 1, lty = 3) 
 ```
 
-While this plot does indicate a general negative relationship between mean CV error and test data accuracy (i.e. as CV error increases, test accuracy decreases), the sample is too small to determine whether or not this data is linear or follows a higher order relationship.
+While this plot does indicate a general negative relationship between mean CV error and test data accuracy (i.e. as CV error increases, test accuracy decreases), the sample is too small to determine whether or not this data is linear or follows a higher order relationship. That said, the associated regression data for the linear best fit in the plot above is shown here:
+
+```{r, echo = FALSE}
+alm = lm(Accuracy ~ CV, data = acc_cv)
+pander(summary(alm))
+```
+
+This model shows that the slope given by CV, while not quite significant yet (p = 0.057), does have the potential to become significant upon the growth of the sample.
 
 The performance of the best subsets logistic regression model was surprising given its reliance on only three variables (`Married`, `Credit_History` and `SemiUrban`) for prediction of the target variable, `Loan_Status`. Despite this strong performance, the best subsets logistic regression model alone resulted in an overall leaderboard rank of 161. The most significant predictors found here differs from those found by Agbemava et al. (2016). This is most likely due to the population studied -- higher income individuals in this project as opposed to lower income cases.
 
-At the time of writing this report, we are currently tied for ${8}^{th}$ place out of a total of 237 participants. In subsequent trials and analyses, this project would benefit greatly from further experimentation with more advanced additive logistic regression models and with neural network architectures. 
+Using our best model, the typical applicant approved for a loan was a married male with no dependents, not self-employed, earning approximately $4000 per month, and requested a loan of about $125000. These results are similar to that seen in the training data set and leans towards higher earners with a lower debt-to-income ratio when compared to the average applicant.
+
+Limitations of this project include the requirement to work with only the data supplied by the data challenge -- the given 14 predictor variables. It is most likely that stronger models could be built upon the acquisition of more data. However, the data provided reflects the realistic scenario of having limited data from a loan application, particularly in the situation where an individual may be a new customer of the bank. In subsequent trials and analyses, this project would benefit greatly from further experimentation with more advanced additive logistic regression models and with neural network architectures. 
+ 
+At the time of writing this report, we are currently tied for ${8}^{th}$ place out of a total of 268 participants. Our results show that even foundational data mining and machine learning techniques can produce powerful prediction models and quite accurate results.
 
 \newpage
 ##References
