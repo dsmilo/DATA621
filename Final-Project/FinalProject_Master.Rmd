@@ -230,7 +230,7 @@ ggplot(melted, aes(value)) + geom_density(aes(fill = variable, col = variable), 
 
 Missing values were also present in the data, either in the form of empty characters (`""`), or `NA`s. Four of the predictors, `Gender`, `Married`, `Dependents`, and `Self_Employed` contained empty characters. Being only a small proportion of the cases (< 1% to 8%), these were in a way imputed when the predictors were converted into binary categorical variables. Four other variables, `LoanAmount`, `Loan_Amount_Term`, `Credit_History`, and `LTI` all contained small numbers of `NA`s. These are either dropped from the dataset, or imputed with the median, depending on the model. Alternative imputation methods, such as filling with a weighted "coin toss" value yielded less accurate results in the models.  A representation of the proportion of missing values is presented below:
 
-```{r, message = FALSE, warning = FALSE, tidy = TRUE, fig.height=4}
+```{r, message = FALSE, warning = FALSE, tidy = TRUE, fig.height=3}
 aggr(train_var, plot=TRUE, sortVars = FALSE, numbers=TRUE, cex.lab  = TRUE)
 ```
 
@@ -242,9 +242,10 @@ Logistic regression is a very common method of classifying data (Thomas, 2000). 
 
 $$\ln { \frac { { p }_{ i } }{ 1-{ p }_{ i } }  } ={ \beta  }_{ 0 }+{ \beta  }_{ 1 }{ X }_{ 1 }+...+{ \beta  }_{ n }{ X  }_{ n } +{ \varepsilon }$$
 
-A few different logistic regression models were developed for this project. The first was a full model using all variables. This model made use of the `glm` function.      
+A few different logistic regression models were developed for this project. The first was a full model using all variables. This model made use of the `glm` function. This model was created as a basic point of comparison. This model produced an AIC of 935.      
 
-The second model created utilized both the `glm` function and the `leaps` package in order to find the best combination/subset of variables that minimizes the Bayesian Information Criterion (BIC). The "best subsets" approach is a method of automated variable selection that seeks to find the best predictors of the target variable. The `regsubsets` function as part of the `leaps` package found the `Married`, `Credit_History` and `SemiUrban` variables to be the best subset of predictors for this data set.        
+The second model created utilized both the `glm` function and the `leaps` package in order to find the best combination/subset of variables that minimizes the Bayesian Information Criterion (BIC). The "best subsets" approach is a method of automated variable selection that seeks to find the best predictors of the target variable. The `regsubsets` function as part of the `leaps` package found the `Married`, `Credit_History` and `SemiUrban` variables to be the best subset of predictors for this data set. The AIC reported for this model was 518.
+
 Ridge regression methods were combined with logistic regression to create a "Logistic Ridge" model, the third of this project, using the `ridge` library. As this library is no longer actively in development, it was manually obtained and installed. Like Ridge Regression, Logistic Ridge Regression introduces a tuning parameter as a penalty to avoid overfitting (Cule & De Iorio, 2012). This is useful as the ridge regression method aims to reduce variance and produce lower mean squared error for higher-dimensional data such as that used in the full model for these data. The ridge penalty used in the `ridge` package as outlined by Cule & De Iorio (2012) is given as:
 
 $$ k = \frac{p}{\hat{\beta}'\hat{\beta}} $$
@@ -304,7 +305,7 @@ Optimal accuracy was attained at 125 iterations, with a steady decline and plate
 
 ROC curves for the linear regression models were created and are displayed here. 
 
-```{r fig.width=10, fig.height=6, echo=FALSE, eval = TRUE}
+```{r fig.width=10, fig.height=5, echo=FALSE, eval = TRUE}
 #This mathematical model can be expressed visually, and is depicted in the following figure:
 #![](http://neuralnetworksanddeeplearning.com/images/tikz10.png)
 
@@ -337,7 +338,7 @@ Many data mining methods were explored for this project. It was determined that 
 
 Here the relationship between the Cross Validation error on training data and accuracy on the test data is shown:
 
-```{r, echo = FALSE}
+```{r, fig.height = 3.5, echo = FALSE}
 #plot(y = as.numeric(data_results2$Accuracy[1:6]), x = mean_cv$"Mean CV Error", type = "p", xlab = "Mean CV Error", ylab = "Accuracy", main = "Relationship between Training Set CV Error and Test Set Accuracy")
 
 acc_cv <- data.frame(Accuracy = as.numeric(data_results2$Accuracy[1:6]), CV = mean_cv$"Mean CV Error")
@@ -386,15 +387,15 @@ Thomas, L. C. (2000). A survey of credit and behavioural scoring: forecasting fi
 
 \newpage
 ##Appendix -- R Code
-```{r, eval = FALSE, echo = TRUE, warning = FALSE, message = FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
-library(knitr)
-opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, comment=NA, fig.align='center')
-knitr::opts_chunk$set(error = TRUE)
+``` {r, eval = FALSE, echo = TRUE, warning = FALSE, message = FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
-library(stringr) #For string functions
-library(glmnet) #For binary logistic regression
-library(leaps) #For best subsets
-library(pROC) #For ROC curve
+##### setup #####
+library(knitr)
+opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, comment=NA, fig.align='center', error=TRUE)
+
+library(glmnet)
+library(leaps)
+library(pROC)
 library(car)
 library(MASS)
 library(ROCR)
@@ -403,9 +404,11 @@ library(stringr)
 library(dplyr)
 library(reshape2)
 library(vcd)
+library(VIM)
 library(pander)
 library(tidyr)
 library(e1071)
+
 
 train <- read.csv("https://github.com/dsmilo/DATA621/raw/master/Final-Project/loan_train.csv", stringsAsFactors = FALSE)
 test = read.csv("https://github.com/dsmilo/DATA621/raw/master/Final-Project/loan_test.csv", stringsAsFactors = FALSE)
@@ -419,14 +422,14 @@ predict.regsubsets <- function(object, newdata, id,...){
   mat[, xvars]%*%coefi
 }
 
-plotROC <- function(model, ndata, gtruth) {
+plotROC <- function(model, ndata, gtruth, name = "") {
   prob <- predict(model, newdata = ndata, type="response")
   pred <- prediction(prob, gtruth)
   perf <- performance(pred, measure = "tpr", x.measure = "fpr")
   auc <- performance(pred, measure = "auc")
   auc <- auc@y.values[[1]]
   roc.data <- data.frame(fpr=unlist(perf@x.values), tpr=unlist(perf@y.values), model="GLM")
-  ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) + geom_ribbon(alpha=0.2) + geom_line(aes(y=tpr)) + ggtitle(paste0("ROC Curve w/ AUC=", auc))
+  ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) + geom_ribbon(alpha=0.2) + geom_line(aes(y=tpr)) + ggtitle(paste0(name, " ROC Curve w/ AUC=", (auc)))
 }
 
 fillwithmedian <- function(x) {
@@ -434,7 +437,19 @@ fillwithmedian <- function(x) {
   x[is.na(x)] = median_val
   return(x)
 }
+###################################
 
+
+##### literature review #####
+library(ReadImages) #Had to install manually
+library(grid)
+download.file("https://cs231n.github.io/assets/nn1/neural_net2.jpeg", "nn1.jpeg")
+img <- read.jpeg("nn1.jpeg")
+grid.raster(img)
+###################################
+
+
+##### data exploration and manipulation #####
 train3 = train
 test2 = test
 
@@ -469,21 +484,58 @@ train4 = train3[complete.cases(train3),]
 
 train = train3[, -1]
 train2 = train4
-#remove(train4)
-#remove(train3)
-
 test = test2
-#remove(test2)
 
 
+train_var = train
+train_var$Property_Area = as.factor(train_var$Property_Area)
+var_class <- data.frame(Class = rep(NA, ncol(train_var) - 4), Levels = rep(NA, ncol(train_var) - 4), stringsAsFactors = FALSE, check.names = FALSE, row.names = names(train_var)[1:(ncol(train_var) - 4)])
+names(var_class) = c("Class", "Levels/Range")
 
-##################################
+for(i in 1:(ncol(train_var)-3)) {
+  var_class[i - 1, 1] <- class(train_var[, i])
+  val = length(levels(train_var[, i]))
+  if (val == 0) {
+    val = paste0(floor(min(train_var[, i], na.rm = TRUE)), " - ", max(train_var[, i], na.rm = TRUE))
+  }
+  var_class[i - 1, 2] <- val
+}
+pander(var_class)
+
+#continuous variables
+cont_vars <- train_var %>% dplyr::select(c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term))
+
+melted <- melt(cont_vars)
+
+ggplot(melted, aes(value)) + geom_density(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scales="free") + scale_y_continuous('', labels=NULL) + ggtitle("Distribution of Continuous Predictors \n") + theme(axis.ticks = element_blank())
+
+#discrete variables
+train_var$Property_Area <- as.numeric(train_var$Property_Area)
+poisson_vars <- train_var %>% dplyr::select(-c(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term, TotalIncome, LTI, Urban, SemiUrban))
+
+melted <- melt(poisson_vars)
+
+library(scales)
+ggplot(melted, aes(value, y = 6 * ..count../sum(..count..))) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scales="free_x") + scale_y_continuous('', labels=percent) + ggtitle("Distribution of Discrete Predictors \n")
+
+#created variables
+created_vars <- train_var %>% dplyr::select(c(TotalIncome, LTI))
+
+melted <- melt(created_vars)
+
+ggplot(melted, aes(value)) + geom_density(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scales="free") + scale_y_continuous('', labels=NULL) + ggtitle("Distribution of Created Predictors \n") + theme(axis.ticks = element_blank())
+
+#missing values
+aggr(train_var, plot=TRUE, sortVars = FALSE, numbers=TRUE, cex.lab  = TRUE)
+###################################
+
+
+##### Model Creation #####
 #Full Model
 glmflagfull <- glm(Loan_Status~.-Property_Area, data = train, family = poisson, control = list(maxit = 100))
 summary(glmflagfull)
 vif(glmflagfull) #Check for collinearity, VIF > 10
 predglmflagfull <- data.frame("class" = train$Loan_Status, "logit" = predict(glmflagfull, train))
-#pROC::roc(class ~ logit, data = predglmflagfull, auc = TRUE, plot = TRUE, smooth =  TRUE)
 
 plotROC(model = glmflagfull, ndata = train, gtruth = train$Loan_Status, name = "Full Model (Poisson)")
 
@@ -493,10 +545,9 @@ testdf$Loan_Status[is.na(testdf$Loan_Status)] = median(testdf$Loan_Status, na.rm
 testdf$Loan_Status = ifelse(testdf$Loan_Status > 0.5, "Y", "N")
 
 write.csv(testdf, paste0("finalresults-", as.numeric(Sys.time()), ".csv"))
-#SCore: 0.770833333333
-###################
+###############
 
-############ Best Subsets
+# Best Subsets
 regfit.full <- regsubsets(Loan_Status~.-Property_Area -Loan_ID, data = train3, nvmax = 17)
 summary(regfit.full)
 par(mar=c(1,1,1,1))
@@ -523,19 +574,15 @@ a = predict(bestsubset21, test, type = "response")
 testdf = data.frame(Loan_ID = test$Loan_ID, Loan_Status = a)
 testdf$Loan_Status[is.na(testdf$Loan_Status)] = median(testdf$Loan_Status, na.rm = TRUE)
 testdf$Loan_Status = ifelse(testdf$Loan_Status > 0.5, "Y", "N")
-#Score = 0.777777777778
-###################################
+###############
 
-############ Logistic Ridge
-library(ridge) #had to install ridge package manually
+# Logistic Ridge
+library(ridge) #installed from source
 train$Loan_Status = as.numeric(as.character(train$Loan_Status))
 train_lr <- data.frame(lapply(train[, -11], fillwithmedian))
 train_lr$Property_Area = train$Property_Area
 
 lr2 = logisticRidge(Loan_Status ~ . -Property_Area, data = train_lr)
-
-
-
 
 plotROC(model = lr2, ndata = train, gtruth = train$Loan_Status, name = "Logistic Ridge")
 
@@ -544,17 +591,13 @@ testdf = data.frame(Loan_ID = test$Loan_ID, Loan_Status = a)
 testdf$Loan_Status[is.na(testdf$Loan_Status)] = median(testdf$Loan_Status, na.rm = TRUE)
 testdf$Loan_Status = ifelse(testdf$Loan_Status > 0.5, "Y", "N")
 write.csv(testdf, paste0("finalresults-", as.numeric(Sys.time()), ".csv"))
+###############
 
-#Score: 0.770833333333
-
-###########################
-
-##############Full model binomial
+#Full model binomial
 glmflagfull <- glm(Loan_Status~.-Property_Area, data = train, family = binomial, control = list(maxit = 100))
 summary(glmflagfull)
 vif(glmflagfull) #Check for collinearity, VIF > 10
 predglmflagfull <- data.frame("class" = train$Loan_Status, "logit" = predict(glmflagfull, train))
-#pROC::roc(class ~ logit, data = predglmflagfull, auc = TRUE, plot = TRUE, smooth =  TRUE)
 
 plotROC(model = glmflagfull, ndata = train, gtruth = train$Loan_Status, name = "Full Model Binomial")
 
@@ -563,14 +606,13 @@ testdf = data.frame(Loan_ID = test$Loan_ID, Loan_Status = a)
 testdf$Loan_Status[is.na(testdf$Loan_Status)] = median(testdf$Loan_Status, na.rm = TRUE)
 testdf$Loan_Status = ifelse(testdf$Loan_Status > 0.5, "Y", "N")
 write.csv(testdf, paste0("finalresults-", as.numeric(Sys.time()), ".csv"))
-#Score: 0.763888888889
-############################
+###############
 
-##########Determination of nodes for neuralnet
+#Neural Net
+##Determination of nodes for neuralnet
 k = 10
 set.seed(1306)
 folds = sample(1:k, nrow(train), replace = TRUE)
-#folds_amt = sample(1:k, nrow(train_amt), replace = TRUE)
 cv.errors1 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 cv.errors2 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
 cv.errors3 = matrix(NA, k, 10, dimnames = list(NULL, paste(1:10)))
@@ -584,7 +626,6 @@ train_2 <- data.frame(lapply(train[, -11], fillwithmedian))
 train_2$Property_Area = train$Property_Area
 scaled = data.frame(lapply(scaled, fillwithmedian))
 
-#train_flag$target = as.numeric(as.character(train_flag$target))
 num_layers = 0
 
 f1 <- as.formula(paste("Loan_Status ~", paste(n[!n %in% "Loan_Status"], collapse = " + ")))
@@ -592,54 +633,21 @@ for (j in 1:k) {
   
   num_layers = num_layers + 5
   print(num_layers)
-# 
-#   model1 <- glm(Loan_Status~.-Property_Area, data = train_2[folds != j, ], family = poisson, control = list(maxit = 100))
-#   model2 <- glm(formula = Loan_Status ~ Married + Credit_History + SemiUrban, family = binomial(link = "logit"), data = train_2[folds != j, ])
-#   model3 <- logisticRidge(Loan_Status ~ . -Property_Area, data = train_2[folds != j, ])
-#   model4 <- glm(Loan_Status~.-Property_Area, data = train_2[folds != j, ], family = binomial, control = list(maxit = 100))
   dat = scaled[folds != j, ]
   dat =dat[complete.cases(dat),]
   model5 <- neuralnet(f1, data=dat, hidden=c(num_layers), linear.output=TRUE, stepmax = 10000000)
-  #model6 <- ada(formula = Loan_Status ~ ., data = train_x1[folds != j, ], iter = 125, loss = "logistic")
-  #model7 <- glm(TARGET_FLAG ~ KIDSDRIV + INCOME + PARENT1 + HOME_VAL + MSTATUS + TRAVTIME + CAR_USE + BLUEBOOK + TIF + OLDCLAIM + CLM_FREQ + REVOKED + MVR_PTS + URBANICITY + Minivan + Sports_Car + Doctor + Manager, data = train_2_flag[folds != j, ], family = binomial(link='logit'))
-  #model8 = glm(TARGET_FLAG ~ KIDSDRIV + INCOME + PARENT1 + HOME_VAL + MSTATUS + TRAVTIME + CAR_USE + BLUEBOOK + TIF + OLDCLAIM + CLM_FREQ + REVOKED + MVR_PTS + URBANICITY + HSDropout + HS + Panel_Truck + Van + PhD, data = train_2_flag[folds != j, ], family = binomial(link='logit'))
   
-  
-  #best.fit = regsubsets(y ~ ., data = train_2_df[folds != j, ], nvmax = 10)
   for (i in 1:10) {
     print(i)
     f = train_2[folds == j, ]
     f = f[complete.cases(f),]
-    
-    # pred1 = predict(model1, f, id = i)
-    # cv.errors1[j, i] = mean((train_2$Loan_Status[folds == j] - pred1) ^ 2, na.rm = TRUE)
-    # 
-    # pred2 = predict(model2, f, id = i) 
-    # cv.errors2[j, i] = mean((train_2$Loan_Status[folds == j] - pred2) ^ 2, na.rm = TRUE)
-    # 
-    # pred3 = predict(model3, f, id = i) 
-    # cv.errors3[j, i] = mean((train_2$Loan_Status[folds == j] - pred3) ^ 2, na.rm = TRUE)
-    # 
-    # pred4 = predict(model4, f, id = i) 
-    # cv.errors4[j, i] = mean((train_2$Loan_Status[folds == j] - pred4) ^ 2, na.rm = TRUE)
-    # 
     dat = scaled[folds == j, ]
-    #dat = dat[complete.cases(dat),]
     dat2 = dat[complete.cases(dat), -11]
     pred5 = neuralnet::compute(model5, dat2) 
     netresult = pred5$net.result[, 1]
     sc = scaled$Loan_Status[folds == j]
     sc = sc[complete.cases(sc)]
     cv.errors5[j, i] = mean((sc - netresult) ^ 2, na.rm = TRUE)      
-    
-    # pred6 = predict(model6, train_x1[folds == j, ], id = i, type = "probs")
-    # cv.errors6[j, i] = mean((train_2$Loan_Status[folds == j] - pred6) ^ 2, na.rm = TRUE)
-    # 
-    # pred7 = predict(model7, train_2_flag[folds == j, ], id = i)
-    # cv.errors7[j, i] = mean((train_2_flag$TARGET_FLAG[folds == j] - pred7) ^ 2, na.rm = TRUE)
-    # 
-    # pred8 = predict(model8, train_2_flag[folds == j, ], id = i)
-    # cv.errors8[j, i] = mean((train_2_flag$TARGET_FLAG[folds == j] - pred8) ^ 2, na.rm = TRUE)   
   }
   
 }
@@ -650,12 +658,11 @@ nn_df = data.frame(Nodes = node_counts, CV_Error = cv_means)
 names(nn_df) = c("Nodes", "Mean CV Error")
 write.csv(nn_df, "~/Downloads/nn_df.csv", row.names = FALSE)
 
+nn_df = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/nn_df.csv")
+plot(x = nn_df$Nodes, y = nn_df$Mean.CV.Error, xlab = "Nodes", ylab = "Mean CV Error", main = "Determination of Number of Nodes for neuralnet", pch = ifelse(nn_df$Nodes==10, 19, 1))
+##########
 
-
-########################
-
-
-############Neural network
+##Neural network
 train4 = train3
 train4 = train4[complete.cases(train4),]
 train4 = train4[, -c(1,12)]
@@ -666,12 +673,6 @@ n <- names(scaled)
 f <- as.formula(paste("Loan_Status ~", paste(n[!n %in% "Loan_Status"], collapse = " + ")))
 nn = neuralnet(f, data=scaled, hidden=c(10), linear.output=TRUE, stepmax = 1000000)
 plot(nn)
-
-
-# pr.nn <- compute(nn, scaled[,-11])
-# pr.nn_ <- pr.nn$net.result*(max(train4$Loan_Status)-min(train4$Loan_Status))+min(train4$Loan_Status)
-# #test.r <- (test_$medv)*(max(data$medv)-min(data$medv))+min(data$medv)
-# pr_nn = ifelse(pr.nn_ > 0.5, 1, 0)
 
 max2 <- function(x) {
   return(max(x, na.rm = TRUE))
@@ -686,29 +687,29 @@ test = test2
 test = test[, -c(1, 12)]
 test <- data.frame(lapply(test, fillwithmedian))
 
-
 maxs.t <- apply(test, 2, max2)
 mins.t <- apply(test, 2, min2)
 scaled.t <- as.data.frame(scale(test, center = mins.t, scale = maxs.t - mins.t))
 scaled.t = as.data.frame(lapply(scaled.t, fillwithmedian))
 pr.test <- neuralnet::compute(nn, scaled.t)
 pr.t_ <- pr.test$net.result*(max(train4$Loan_Status)-min(train4$Loan_Status))+min(train4$Loan_Status)
-#test.r <- (test_$medv)*(max(data$medv)-min(data$medv))+min(data$medv)
 pr_nn.t = ifelse(pr.t_ > 0.5, "Y", "N")
-#pr_nn.t = fillwithmedian(pr_nn.t)
 
 test1 = read.csv("https://github.com/dsmilo/DATA621/raw/master/Final-Project/loan_test.csv", stringsAsFactors = FALSE)
 df = data.frame(Loan_ID = test1$Loan_ID, Loan_Status = as.data.frame(as.vector(pr_nn.t)))
 names(df) = c("Loan_ID", "Loan_Status")
 sum(is.na(df[, 2])) #hopefully 0
 write.csv(df, paste0("nn-", as.numeric(Sys.time()), ".csv"), row.names = FALSE)
-#Score: 0.743055555556
-#####################################
+
+download.file("https://github.com/aadikalloo/AadiMSDA/raw/master/IS621-Data-Mining/nn2.jpg", "nn2.jpeg")
+img <- read.jpeg("nn2.jpeg")
+grid.raster(img)
+##########
+###############
 
 
-################ ada package analysis
+# ada package analysis
 model1 = list()
-
 
 for (i in 1:20) {
   iters = 25 + 25*i
@@ -721,10 +722,10 @@ for (i in 1:20) {
 
 ada_results = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/ada.csv", header = FALSE)
 names(ada_results) = c("Iterations", "Accuracy")
-###################
+###############
 
 
-################ Adaboost manual implementation
+# Adaboost manual implementation
 wts = list()
 
 models = list()
@@ -733,8 +734,6 @@ error_rate = list()
 final = 0
 predictions = list()
 total = 12
-
-
 
 train_x <- data.frame(lapply(train[-c(1,2), -11], fillwithmedian))
 test_x = data.frame(lapply(test2[, -c(1, 12)], fillwithmedian))
@@ -749,7 +748,6 @@ Y_hat_run = list()
 Y_hat_run[[1]] = rep(1, length(train_x1[,1]))
 
 for (i in 1:total) {
-  #train_x1 = train_x[folds != i,]
   train_x1 = train_x
 
   models[[i]] = glm(Loan_Status ~ ., data = train_x1, family = binomial, weights = wts[[i]])
@@ -764,22 +762,15 @@ for (i in 1:total) {
   wts[[i + 1]] = wts[[i + 1]]/sum(wts[[i + 1]])
 }
 
-
 for (i in 1:total) {
   predictions[[i]] = predict(models[[i]], test_x, type = "response")
   predictions[[i]] = alpha[[i]]*predictions[[i]]
-  
-  #predictions[[i]] = ifelse(predictions[[i]] > 0.5*alpha[[i]], 1, -1)
-  #predictions[[i]] = ifelse(predictions[[i]] > 0.5, 1, -1)
-  
-  #final = final + predictions
 }
 
 toEval = "predictions[[1]]"
 
 for (i in 2:4) {
   toEval = paste0(toEval, " * predictions[[", i, "]]")
-  
 }
 
 prop = table(train$Loan_Status)[[1]]/table(train$Loan_Status)[[2]]
@@ -788,19 +779,29 @@ pred2 = ifelse((rank(Y_hat_run))>prop*length(test[,1]),1,0)
 
 results = eval(parse(text = toEval))
 results = ifelse(results < error_rate[[1]], "N", "Y")
-#results = ifelse(results < 0, 0, 1)
-#results = ifelse(results < 0, "N", "Y")
 
-
-#results = ifelse(pred2 == 1, "Y", "N")
 testdf = data.frame(Loan_ID = test2$Loan_ID, Loan_Status = results)
 
 write.csv(testdf, paste0("finalresults-", as.numeric(Sys.time()), ".csv"), row.names = FALSE)
-#Score: 0.715277777778
-################
+###############
+###################################
 
-#####10 fold Cross Validation
 
+##### Results #####
+data_results = data.frame(Model = c("ada package", "Best Subsets", "Logistic Ridge", "Full Model, Binomial", "Full Model, Poisson", "Neural Network (neuralnet package)", "Manually implemented adaboost algorithm"), Accuracy = c("0.8055", "0.7778", "0.7708", "0.7638", "0.7708", "0.7431", "0.7153"), stringsAsFactors = FALSE)
+data_results2 = data_results[order(data_results$Accuracy, decreasing = TRUE),]
+kable(data_results2)
+
+ada_results = read.csv("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/ada.csv", header = FALSE)
+names(ada_results) = c("Iterations", "Accuracy")
+plot(x = ada_results$Iterations, y = ada_results$Accuracy, xlab = "Iterations", ylab = "Accuracy", ylim = c(0.72, 0.82), main = "Effect of number of iteratons on test data accuracy", pch = ifelse(ada_results$Accuracy == 0.8055, 19, 1))
+lines(smooth.spline(x = ada_results$Iterations, y = ada_results$Accuracy))
+
+download.file("https://raw.githubusercontent.com/aadikalloo/AadiMSDA/master/IS621-Data-Mining/roc2.jpg", "roc.jpeg")
+img <- read.jpeg("roc.jpeg")
+grid.raster(img)
+
+#10-fold CV
 k = 10
 set.seed(1306)
 folds = sample(1:k, nrow(train), replace = TRUE)
@@ -830,7 +831,6 @@ for (j in 1:k) {
   model5 <- neuralnet(f1, data=dat, hidden=c(5, 3), linear.output=TRUE, stepmax = 10000000)
   model6 <- ada(formula = Loan_Status ~ ., data = train_x1[folds != j, ], iter = 125, loss = "logistic")
 
-  #best.fit = regsubsets(y ~ ., data = train_2_df[folds != j, ], nvmax = 10)
   for (i in 1:10) {
     print(i)
     f = train_2[folds == j, ]
@@ -863,15 +863,12 @@ for (j in 1:k) {
   
 }
 
-
-
 mean.cv.errors1 <- apply(cv.errors1, 2, mean)
 mean.cv.errors2 <- apply(cv.errors2, 2, mean)
 mean.cv.errors3 <- apply(cv.errors3, 2, mean)
 mean.cv.errors4 <- apply(cv.errors4, 2, mean)
 mean.cv.errors5 <- apply(cv.errors5, 2, mean)
 mean.cv.errors6 <- apply(cv.errors6, 2, mean)
-
 
 all.cv.error = data.frame(
   mean(mean.cv.errors1),
@@ -880,14 +877,26 @@ all.cv.error = data.frame(
   mean(mean.cv.errors4), 
   mean(mean.cv.errors5),
   mean(mean.cv.errors6)
-#  mean(mean.cv.errors7),
-#  mean(mean.cv.errors8)
 )
+
 names(all.cv.error) = c("Full Regression Model, Poisson", "Best Subsets Logistic Regression Model", "Logistic Ridge Regression Model", "Full Logistic Regression Model", "Neural Network", "Additive (Boosted) Logistic Regression Model")
 all.cv.error = t(all.cv.error)
 names(all.cv.error) = c("Model", "Mean CV Error")
 
+mean_cv_results = read.csv("https://github.com/aadikalloo/AadiMSDA/raw/master/IS621-Data-Mining/allcverror.csv", check.names = FALSE)
+mean_cv = mean_cv_results[order(mean_cv_results$"Mean CV Error"),]
+row.names(mean_cv) = NULL
+pander(mean_cv)
+###################################
 
 
+##### discussion #####
+acc_cv <- data.frame(Accuracy = as.numeric(data_results2$Accuracy[1:6]), CV = mean_cv$"Mean CV Error")
+rownames(acc_cv) <- c("Adaboost", "Best Subsets Logistic", "Logistic Ridge", "Full Poisson", "Full Binomial", "Neural Network")
+
+ggplot(acc_cv, aes(x = CV, y = Accuracy)) + geom_point() + geom_text(aes(label=rownames(acc_cv)), vjust="inward", hjust = "inward", check_overlap = TRUE) + geom_smooth(alpha = 0.25, method = glm, fill = 3, col = 3, se=FALSE, lty=3) + scale_x_continuous('Mean Cross-Validation Error') + ggtitle('Relationship between Training Set CV Error and Test Set Accuracy\n') + theme(plot.title = element_text(lineheight=.8, face="bold")) + geom_smooth(alpha = 0.25, method = "loess", se=FALSE, lwd = 1, lty = 3) 
+
+alm = lm(Accuracy ~ CV, data = acc_cv)
+pander(summary(alm))
+###################################
 ```
-
