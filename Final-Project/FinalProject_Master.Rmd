@@ -28,6 +28,7 @@ library(stringr)
 library(dplyr)
 library(reshape2)
 library(vcd)
+library(VIM)
 library(pander)
 library(tidyr)
 library(e1071)
@@ -182,6 +183,8 @@ melted <- melt(poisson_vars)
 
 ggplot(melted, aes(value)) + geom_bar(aes(fill = variable, col = variable), alpha = 0.5, show.legend = FALSE) + facet_wrap(~variable, scale="free")+ ggtitle("Distribution of Discrete Variables \n")
 
+#Missing values
+aggr(train_var, plot=TRUE, sortVars = TRUE, numbers=TRUE, cex.lab  = TRUE)
 ```
 
 ###Data Manipulation    
